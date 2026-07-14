@@ -4,9 +4,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-# -----------------------------
+# =============================
 # 設定
-# -----------------------------
+# =============================
 
 st.set_page_config(
     page_title="Project X",
@@ -15,17 +15,17 @@ st.set_page_config(
 )
 
 
-# -----------------------------
+# =============================
 # タイトル
-# -----------------------------
+# =============================
 
 st.title("🚀 Project X")
 st.subheader("AI株価分析アプリ")
 
 
-# -----------------------------
+# =============================
 # 入力
-# -----------------------------
+# =============================
 
 code = st.text_input(
     "銘柄コード",
@@ -33,37 +33,44 @@ code = st.text_input(
 )
 
 period = st.selectbox(
-    "期間",
+    "分析期間",
     ["3mo", "6mo", "1y", "3y", "5y"],
     index=2
 )
 
 
-# -----------------------------
+# =============================
 # 分析開始
-# -----------------------------
+# =============================
 
 if st.button("🚀 分析する"):
 
     ticker = yf.Ticker(code + ".T")
 
-    data = ticker.history(period=period)
+    data = ticker.history(
+        period=period
+    )
 
 
     if data.empty:
-        st.error("銘柄が見つかりません")
+
+        st.error(
+            "銘柄が見つかりません"
+        )
+
 
     else:
 
-        # -----------------------------
-        # 移動平均
-        # -----------------------------
+        # =============================
+        # テクニカル計算
+        # =============================
 
         data["MA25"] = (
             data["Close"]
             .rolling(25)
             .mean()
         )
+
 
         data["MA75"] = (
             data["Close"]
@@ -72,19 +79,36 @@ if st.button("🚀 分析する"):
         )
 
 
-        # -----------------------------
         # RSI
-        # -----------------------------
 
         delta = data["Close"].diff()
 
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
+        gain = delta.where(
+            delta > 0,
+            0
+        )
 
-        avg_gain = gain.rolling(14).mean()
-        avg_loss = loss.rolling(14).mean()
+        loss = -delta.where(
+            delta < 0,
+            0
+        )
+
+
+        avg_gain = (
+            gain
+            .rolling(14)
+            .mean()
+        )
+
+        avg_loss = (
+            loss
+            .rolling(14)
+            .mean()
+        )
+
 
         rs = avg_gain / avg_loss
+
 
         data["RSI"] = (
             100 -
@@ -92,9 +116,7 @@ if st.button("🚀 分析する"):
         )
 
 
-        # -----------------------------
         # MACD
-        # -----------------------------
 
         ema12 = (
             data["Close"]
@@ -109,7 +131,10 @@ if st.button("🚀 分析する"):
         )
 
 
-        data["MACD"] = ema12 - ema26
+        data["MACD"] = (
+            ema12 - ema26
+        )
+
 
         data["Signal"] = (
             data["MACD"]
@@ -119,26 +144,51 @@ if st.button("🚀 分析する"):
 
 
         latest = data.iloc[-1]
-                # -----------------------------
+
+
+        # 前日比
+
+        previous = data.iloc[-2]
+
+        change = (
+            latest["Close"]
+            -
+            previous["Close"]
+        )
+
+
+        change_percent = (
+            change
+            /
+            previous["Close"]
+            *
+            100
+        )
+                # =============================
         # 基本情報表示
-        # -----------------------------
+        # =============================
 
         col1, col2, col3, col4 = st.columns(4)
 
+
         col1.metric(
             "現在値",
-            f"{latest['Close']:.2f}円"
+            f"{latest['Close']:.2f}円",
+            f"{change:+.2f}円 ({change_percent:+.2f}%)"
         )
+
 
         col2.metric(
             "RSI",
             f"{latest['RSI']:.2f}"
         )
 
+
         col3.metric(
             "MACD",
             f"{latest['MACD']:.2f}"
         )
+
 
         col4.metric(
             "出来高",
@@ -146,60 +196,62 @@ if st.button("🚀 分析する"):
         )
 
 
-        # -----------------------------
+        # =============================
         # Project X スコア
-        # -----------------------------
+        # =============================
 
         score = 0
+
 
         if latest["Close"] > latest["MA25"]:
             score += 1
 
+
         if latest["MA25"] > latest["MA75"]:
             score += 2
 
+
         if 30 <= latest["RSI"] <= 70:
             score += 1
+
 
         if latest["MACD"] > latest["Signal"]:
             score += 2
 
 
 
-        # -----------------------------
-        # AI分析カード
-        # -----------------------------
+        # =============================
+        # AI判定
+        # =============================
 
         st.divider()
 
-        st.subheader("🤖 Project X AI分析")
+        st.subheader(
+            "🤖 Project X AI分析"
+        )
 
 
-        st.success(
-            f"総合スコア：{score} / 6"
+        st.metric(
+            "総合スコア",
+            f"{score} / 6"
         )
 
 
         if score >= 5:
 
-            st.markdown(
+            st.success(
                 """
-                ## 🟢 買い優勢
+🟢 買い優勢
 
-                ⭐⭐⭐⭐⭐
+★★★★★
 
-                **AIコメント**
+・移動平均良好
+・MACD上昇傾向
+・RSI正常範囲
 
-                ・移動平均は良好  
-                ・MACDは上昇傾向  
-                ・RSIは過熱感なし  
-
-                **戦略**
-                
-                短期：強気  
-                
-                中期：強気
-                """
+短期：強気
+中期：強気
+"""
             )
 
 
@@ -207,18 +259,14 @@ if st.button("🚀 分析する"):
 
             st.info(
                 """
-                ## 🟡 中立
+🟡 中立
 
-                ⭐⭐⭐
+★★★
 
-                **AIコメント**
+・上昇と下落材料が混在
 
-                ・上昇材料と下落材料が混在
-
-                **戦略**
-
-                慎重に判断
-                """
+慎重判断
+"""
             )
 
 
@@ -226,30 +274,30 @@ if st.button("🚀 分析する"):
 
             st.error(
                 """
-                ## 🔴 売り優勢
+🔴 売り優勢
 
-                ⭐⭐
+★★
 
-                **AIコメント**
+・弱いシグナルが多い
 
-                ・弱いシグナルが多い
-
-                **戦略**
-
-                様子見
-                """
+様子見
+"""
             )
 
 
-        # -----------------------------
-        # チャート
-        # -----------------------------
+        # =============================
+        # チャート作成
+        # =============================
 
         fig = make_subplots(
             rows=3,
             cols=1,
             shared_xaxes=True,
-            row_heights=[0.5,0.25,0.25]
+            row_heights=[
+                0.5,
+                0.25,
+                0.25
+            ]
         )
 
 
@@ -269,7 +317,7 @@ if st.button("🚀 分析する"):
         )
 
 
-        # 移動平均
+        # MA25
 
         fig.add_trace(
             go.Scatter(
@@ -282,6 +330,8 @@ if st.button("🚀 分析する"):
         )
 
 
+        # MA75
+
         fig.add_trace(
             go.Scatter(
                 x=data.index,
@@ -291,9 +341,9 @@ if st.button("🚀 分析する"):
             row=1,
             col=1
         )
-
-
+                # =============================
         # RSI
+        # =============================
 
         fig.add_trace(
             go.Scatter(
@@ -306,7 +356,9 @@ if st.button("🚀 分析する"):
         )
 
 
+        # =============================
         # MACD
+        # =============================
 
         fig.add_trace(
             go.Scatter(
@@ -329,6 +381,10 @@ if st.button("🚀 分析する"):
             col=1
         )
 
+
+        # =============================
+        # チャート設定
+        # =============================
 
         fig.update_layout(
             height=1000,
