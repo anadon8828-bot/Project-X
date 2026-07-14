@@ -4,31 +4,46 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
+# -----------------------------
+# 設定
+# -----------------------------
+
 st.set_page_config(
     page_title="Project X",
-    page_icon="📈",
+    page_icon="🚀",
     layout="wide"
 )
 
 
-st.title("🚀 Project X")
-st.subheader("株価分析アプリ")
+# -----------------------------
+# タイトル
+# -----------------------------
 
+st.title("🚀 Project X")
+st.subheader("AI株価分析アプリ")
+
+
+# -----------------------------
+# 入力
+# -----------------------------
 
 code = st.text_input(
-    "銘柄コード（例：7203）",
+    "銘柄コード",
     "7203"
 )
 
-
 period = st.selectbox(
-    "表示期間",
+    "期間",
     ["3mo", "6mo", "1y", "3y", "5y"],
     index=2
 )
 
 
-if st.button("株価を分析"):
+# -----------------------------
+# 分析開始
+# -----------------------------
+
+if st.button("🚀 分析する"):
 
     ticker = yf.Ticker(code + ".T")
 
@@ -36,17 +51,31 @@ if st.button("株価を分析"):
 
 
     if data.empty:
-
         st.error("銘柄が見つかりません")
 
     else:
 
+        # -----------------------------
         # 移動平均
-        data["MA25"] = data["Close"].rolling(25).mean()
-        data["MA75"] = data["Close"].rolling(75).mean()
+        # -----------------------------
+
+        data["MA25"] = (
+            data["Close"]
+            .rolling(25)
+            .mean()
+        )
+
+        data["MA75"] = (
+            data["Close"]
+            .rolling(75)
+            .mean()
+        )
 
 
-        # RSI計算
+        # -----------------------------
+        # RSI
+        # -----------------------------
+
         delta = data["Close"].diff()
 
         gain = delta.where(delta > 0, 0)
@@ -57,23 +86,44 @@ if st.button("株価を分析"):
 
         rs = avg_gain / avg_loss
 
-        data["RSI"] = 100 - (100 / (1 + rs))
+        data["RSI"] = (
+            100 -
+            (100 / (1 + rs))
+        )
 
 
-        # MACD計算
-        ema12 = data["Close"].ewm(span=12).mean()
-        ema26 = data["Close"].ewm(span=26).mean()
+        # -----------------------------
+        # MACD
+        # -----------------------------
+
+        ema12 = (
+            data["Close"]
+            .ewm(span=12)
+            .mean()
+        )
+
+        ema26 = (
+            data["Close"]
+            .ewm(span=26)
+            .mean()
+        )
+
 
         data["MACD"] = ema12 - ema26
-        data["Signal"] = data["MACD"].ewm(span=9).mean()
+
+        data["Signal"] = (
+            data["MACD"]
+            .ewm(span=9)
+            .mean()
+        )
 
 
         latest = data.iloc[-1]
+                # -----------------------------
+        # 基本情報表示
+        # -----------------------------
 
-
-        # 指標表示
-
-        col1,col2,col3,col4 = st.columns(4)
+        col1, col2, col3, col4 = st.columns(4)
 
         col1.metric(
             "現在値",
@@ -96,46 +146,104 @@ if st.button("株価を分析"):
         )
 
 
-        # 判定
+        # -----------------------------
+        # Project X スコア
+        # -----------------------------
+
+        score = 0
+
+        if latest["Close"] > latest["MA25"]:
+            score += 1
+
+        if latest["MA25"] > latest["MA75"]:
+            score += 2
+
+        if 30 <= latest["RSI"] <= 70:
+            score += 1
+
+        if latest["MACD"] > latest["Signal"]:
+            score += 2
+
+
+
+        # -----------------------------
+        # AI分析カード
+        # -----------------------------
 
         st.divider()
 
-        st.subheader("🤖 Project X 判定")
+        st.subheader("🤖 Project X AI分析")
 
 
-        if latest["RSI"] > 70:
+        st.success(
+            f"総合スコア：{score} / 6"
+        )
 
-            st.warning(
-                "RSI：買われすぎ注意"
+
+        if score >= 5:
+
+            st.markdown(
+                """
+                ## 🟢 買い優勢
+
+                ⭐⭐⭐⭐⭐
+
+                **AIコメント**
+
+                ・移動平均は良好  
+                ・MACDは上昇傾向  
+                ・RSIは過熱感なし  
+
+                **戦略**
+                
+                短期：強気  
+                
+                中期：強気
+                """
             )
 
-        elif latest["RSI"] < 30:
 
-            st.success(
-                "RSI：売られすぎの可能性"
-            )
-
-        else:
+        elif score >= 3:
 
             st.info(
-                "RSI：適正範囲"
+                """
+                ## 🟡 中立
+
+                ⭐⭐⭐
+
+                **AIコメント**
+
+                ・上昇材料と下落材料が混在
+
+                **戦略**
+
+                慎重に判断
+                """
             )
 
-
-        if latest["MACD"] > latest["Signal"]:
-
-            st.success(
-                "MACD：上昇トレンド傾向"
-            )
 
         else:
 
-            st.warning(
-                "MACD：下落トレンド傾向"
+            st.error(
+                """
+                ## 🔴 売り優勢
+
+                ⭐⭐
+
+                **AIコメント**
+
+                ・弱いシグナルが多い
+
+                **戦略**
+
+                様子見
+                """
             )
 
 
+        # -----------------------------
         # チャート
+        # -----------------------------
 
         fig = make_subplots(
             rows=3,
@@ -144,6 +252,8 @@ if st.button("株価を分析"):
             row_heights=[0.5,0.25,0.25]
         )
 
+
+        # 株価
 
         fig.add_trace(
             go.Candlestick(
@@ -158,6 +268,8 @@ if st.button("株価を分析"):
             col=1
         )
 
+
+        # 移動平均
 
         fig.add_trace(
             go.Scatter(
@@ -227,5 +339,5 @@ if st.button("株価を分析"):
 
         st.plotly_chart(
             fig,
-            use_container_width=True
+            width="stretch"
         )
