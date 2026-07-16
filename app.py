@@ -3,6 +3,9 @@ import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+import pandas as pd
+from datetime import datetime
+import os
 
 # =============================
 # 設定
@@ -236,6 +239,39 @@ if st.button("🚀 分析する"):
             f"{score} / 6"
         )
 
+                # =============================
+        # AI予測ログ保存
+        # =============================
+
+        log_file = "prediction_history.csv"
+
+        new_data = pd.DataFrame(
+    [{
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "code": code,
+        "price": latest["Close"],
+        "score": score,
+        "prediction": "BUY" if score >= 5 else "WAIT",
+        "next_price": "",
+        "result": ""
+    }]
+)
+
+
+        if os.path.exists(log_file):
+
+            old_data = pd.read_csv(log_file)
+
+            new_data = pd.concat(
+                [old_data, new_data],
+                ignore_index=True
+            )
+
+
+        new_data.to_csv(
+            log_file,
+            index=False
+        )
 
         if score >= 5:
 
@@ -397,3 +433,15 @@ if st.button("🚀 分析する"):
             fig,
             width="stretch"
         )
+
+                # =============================
+        # AI予測履歴
+        # =============================
+
+        st.divider()
+
+        st.subheader("📚 AI予測履歴")
+
+        history = pd.read_csv("prediction_history.csv")
+
+        st.dataframe(history, width="stretch")
