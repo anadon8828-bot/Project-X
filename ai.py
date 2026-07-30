@@ -10,7 +10,7 @@ class AIEngine:
         if not os.path.exists("model.pkl"):
             raise FileNotFoundError("model.pkl がありません")
 
-        self.model = joblib.load("model.pkl")
+        self.model = joblib.load("model_small.pkl")
 
 
     def predict(self, latest):
