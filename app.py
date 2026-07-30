@@ -1,56 +1,90 @@
 import streamlit as st
 import yfinance as yf
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-import pandas as pd
-from datetime import datetime
-import os
+from technical import calculate_indicators
+from ai import AIEngine
+from ranking import create_ranking
+from portfolio import calculate_portfolio
+from backtest import run_backtest
 
-# =============================
+
+# =========================
 # 設定
-# =============================
+# =========================
 
 st.set_page_config(
-    page_title="Project X",
+    page_title="Project X V3",
     page_icon="🚀",
-    layout="wide"
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
 
-# =============================
-# タイトル
-# =============================
+st.title(
+    "🚀 Project X Version 3.0"
+)
 
-st.title("🚀 Project X")
-st.subheader("AI株価分析アプリ")
+st.subheader(
+    "AI株価分析システム"
+)
 
 
-# =============================
-# 入力
-# =============================
+# =========================
+# AI読み込み
+# =========================
+
+try:
+
+    ai = AIEngine()
+
+except Exception as e:
+
+    st.error(
+        str(e)
+    )
+
+    st.stop()
+
+
+
+# =========================
+# 銘柄入力
+# =========================
 
 code = st.text_input(
     "銘柄コード",
     "7203"
 )
 
+
 period = st.selectbox(
     "分析期間",
-    ["3mo", "6mo", "1y", "3y", "5y"],
-    index=2
+    [
+        "6mo",
+        "1y",
+        "3y",
+        "5y"
+    ],
+    index=1
 )
 
 
-# =============================
-# 分析開始
-# =============================
 
-if st.button("🚀 分析する"):
+# =========================
+# 分析
+# =========================
 
-    ticker = yf.Ticker(code + ".T")
+if st.button(
+    "🚀 分析開始"
+):
 
-    data = ticker.history(
+
+    data = yf.Ticker(
+        code + ".T"
+    ).history(
         period=period
     )
 
@@ -58,390 +92,1111 @@ if st.button("🚀 分析する"):
     if data.empty:
 
         st.error(
-            "銘柄が見つかりません"
+            "データ取得失敗"
+        )
+
+        st.stop()
+
+
+
+    # テクニカル計算
+
+    data = calculate_indicators(
+        data
+    )
+
+
+    latest = data.iloc[-1]
+
+
+    # AI判定
+
+    probability, signal = ai.predict(
+        latest
+    )
+
+
+    st.divider()
+
+    st.subheader(
+        "🤖 AI予測"
+    )
+
+
+    col1, col2 = st.columns(2)
+
+
+    col1.metric(
+        "上昇確率",
+        f"{probability*100:.1f}%"
+    )
+
+
+    if probability >= 0.65:
+
+        col2.error(
+            "🔴 BUY"
+        )
+
+
+    elif probability >= 0.5:
+
+        col2.warning(
+            "🟡 WAIT"
         )
 
 
     else:
 
-        # =============================
-        # テクニカル計算
-        # =============================
-
-        data["MA25"] = (
-            data["Close"]
-            .rolling(25)
-            .mean()
+        col2.success(
+            "🟢 SELL"
         )
 
+    # 現在データ
 
-        data["MA75"] = (
-            data["Close"]
-            .rolling(75)
-            .mean()
-        )
+    st.divider()
 
-
-        # RSI
-
-        delta = data["Close"].diff()
-
-        gain = delta.where(
-            delta > 0,
-            0
-        )
-
-        loss = -delta.where(
-            delta < 0,
-            0
-        )
+    st.subheader(
+        "📌 現在データ"
+    )
 
 
-        avg_gain = (
-            gain
-            .rolling(14)
-            .mean()
-        )
-
-        avg_loss = (
-            loss
-            .rolling(14)
-            .mean()
-        )
+    a,b,c,d = st.columns(4)
 
 
-        rs = avg_gain / avg_loss
+    a.metric(
+        "現在値",
+        f"{latest['Close']:.2f}円"
+    )
 
 
-        data["RSI"] = (
-            100 -
-            (100 / (1 + rs))
-        )
+    b.metric(
+        "RSI",
+        f"{latest['RSI']:.2f}"
+    )
 
 
-        # MACD
-
-        ema12 = (
-            data["Close"]
-            .ewm(span=12)
-            .mean()
-        )
-
-        ema26 = (
-            data["Close"]
-            .ewm(span=26)
-            .mean()
-        )
+    c.metric(
+        "MACD",
+        f"{latest['MACD']:.2f}"
+    )
 
 
-        data["MACD"] = (
-            ema12 - ema26
-        )
+    d.metric(
+        "出来高",
+        f"{int(latest['Volume']):,}"
+    )
+        # =========================
+    # チャート表示
+    # =========================
+
+    st.divider()
+
+    st.subheader(
+        "📈 Project X チャート"
+    )
 
 
-        data["Signal"] = (
-            data["MACD"]
-            .ewm(span=9)
-            .mean()
-        )
+    fig = make_subplots(
+        rows=3,
+        cols=1,
+        shared_xaxes=True,
+        row_heights=[
+            0.5,
+            0.25,
+            0.25
+        ]
+    )
 
 
-        latest = data.iloc[-1]
+    fig.add_trace(
+        go.Candlestick(
+            x=data.index,
+            open=data["Open"],
+            high=data["High"],
+            low=data["Low"],
+            close=data["Close"],
+            name="株価"
+        ),
+        row=1,
+        col=1
+    )
 
 
-        # 前日比
-
-        previous = data.iloc[-2]
-
-        change = (
-            latest["Close"]
-            -
-            previous["Close"]
-        )
-
-
-        change_percent = (
-            change
-            /
-            previous["Close"]
-            *
-            100
-        )
-                # =============================
-        # 基本情報表示
-        # =============================
-
-        col1, col2, col3, col4 = st.columns(4)
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["MA25"],
+            name="MA25"
+        ),
+        row=1,
+        col=1
+    )
 
 
-        col1.metric(
-            "現在値",
-            f"{latest['Close']:.2f}円",
-            f"{change:+.2f}円 ({change_percent:+.2f}%)"
-        )
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["MA75"],
+            name="MA75"
+        ),
+        row=1,
+        col=1
+    )
 
 
-        col2.metric(
-            "RSI",
-            f"{latest['RSI']:.2f}"
-        )
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["RSI"],
+            name="RSI"
+        ),
+        row=2,
+        col=1
+    )
 
 
-        col3.metric(
-            "MACD",
-            f"{latest['MACD']:.2f}"
-        )
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["MACD"],
+            name="MACD"
+        ),
+        row=3,
+        col=1
+    )
+    
 
 
-        col4.metric(
-            "出来高",
-            f"{int(latest['Volume']):,}"
-        )
+    fig.update_layout(
+        height=900,
+        xaxis_rangeslider_visible=False
+    )
 
 
-        # =============================
-        # Project X スコア
-        # =============================
+    st.plotly_chart(
+        fig,
+        width="stretch"
+    )
+    
+    # =========================
+# AIおすすめランキング
+# =========================
 
-        score = 0
+st.divider()
 
-
-        if latest["Close"] > latest["MA25"]:
-            score += 1
-
-
-        if latest["MA25"] > latest["MA75"]:
-            score += 2
-
-
-        if 30 <= latest["RSI"] <= 70:
-            score += 1
-
-
-        if latest["MACD"] > latest["Signal"]:
-            score += 2
-
-
-
-        # =============================
-        # AI判定
-        # =============================
-
-        st.divider()
-
-        st.subheader(
-            "🤖 Project X AI分析"
-        )
-
-
-        st.metric(
-            "総合スコア",
-            f"{score} / 6"
-        )
-
-                # =============================
-        # AI予測ログ保存
-        # =============================
-
-        log_file = "prediction_history.csv"
-
-        new_data = pd.DataFrame(
-    [{
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "code": code,
-        "price": latest["Close"],
-        "score": score,
-        "prediction": "BUY" if score >= 5 else "WAIT",
-        "next_price": "",
-        "result": ""
-    }]
+st.subheader(
+    "🏆 AIおすすめランキング"
 )
 
 
-        if os.path.exists(log_file):
+ranking_codes = [
+    "7203",
+    "6758",
+    "9984",
+    "8306",
+    "9432",
+    "7011",
+    "6857",
+    "6146",
+    "8035",
+    "4063",
+    "6501",
+    "6098",
+    "8058",
+    "8001",
+    "8766",
+    "8411",
+    "4502",
+    "5108",
+    "6367",
+    "9433"
+]
 
-            old_data = pd.read_csv(log_file)
 
-            new_data = pd.concat(
-                [old_data, new_data],
-                ignore_index=True
-            )
+ranking_df = create_ranking(
+    ai.model,
+    ranking_codes
+)
 
 
-        new_data.to_csv(
-            log_file,
-            index=False
+if not ranking_df.empty:
+
+    st.dataframe(
+        ranking_df,
+        width="stretch"
+    )
+
+else:
+
+    st.info(
+        "ランキング計算できませんでした"
+    )
+    # =========================
+# ポートフォリオ管理
+# =========================
+
+st.divider()
+
+st.subheader(
+    "📦 My Portfolio"
+)
+
+
+portfolio = [
+
+    {
+        "code": "9519",
+        "name": "PowerX",
+        "amount": 500,
+        "buy": 2373
+    },
+
+    {
+        "code": "7203",
+        "name": "トヨタ",
+        "amount": 100,
+        "buy": 3000
+    }
+
+]
+
+
+portfolio_df, total_profit = calculate_portfolio(
+    portfolio
+)
+
+
+if not portfolio_df.empty:
+
+    st.dataframe(
+        portfolio_df,
+        width="stretch"
+    )
+
+
+    if total_profit >= 0:
+
+        st.success(
+            f"🟢 合計損益 +{total_profit:,.0f}円"
         )
 
-        if score >= 5:
+    else:
 
-            st.success(
-                """
-🟢 買い優勢
-
-★★★★★
-
-・移動平均良好
-・MACD上昇傾向
-・RSI正常範囲
-
-短期：強気
-中期：強気
-"""
-            )
+        st.error(
+            f"🔴 合計損益 {total_profit:,.0f}円"
+        )
 
 
-        elif score >= 3:
+else:
 
-            st.info(
-                """
-🟡 中立
+    st.info(
+        "保有データなし"
+    )
+    # =========================
+# AIバックテスト
+# =========================
 
-★★★
+st.divider()
 
-・上昇と下落材料が混在
-
-慎重判断
-"""
-            )
-
-
-        else:
-
-            st.error(
-                """
-🔴 売り優勢
-
-★★
-
-・弱いシグナルが多い
-
-様子見
-"""
-            )
+st.subheader(
+    "📊 AIバックテスト"
+)
 
 
-        # =============================
-        # チャート作成
-        # =============================
+backtest_code = st.text_input(
+    "検証銘柄コード",
+    "7203",
+    key="backtest_code"
+)
 
-        fig = make_subplots(
-            rows=3,
-            cols=1,
-            shared_xaxes=True,
-            row_heights=[
-                0.5,
-                0.25,
-                0.25
+
+backtest_period = st.selectbox(
+    "検証期間",
+    [
+        "1y",
+        "3y",
+        "5y"
+    ],
+    key="backtest_period"
+)
+
+
+if st.button(
+    "📈 バックテスト開始"
+):
+
+
+    result = run_backtest(
+        ai.model,
+        backtest_code,
+        backtest_period
+    )
+
+
+    if not result.empty:
+
+
+        st.dataframe(
+            result,
+            width="stretch"
+        )
+
+
+        wins = len(
+            result[
+                result["勝敗"]=="WIN"
             ]
         )
 
 
-        # 株価
-
-        fig.add_trace(
-            go.Candlestick(
-                x=data.index,
-                open=data["Open"],
-                high=data["High"],
-                low=data["Low"],
-                close=data["Close"],
-                name="株価"
-            ),
-            row=1,
-            col=1
+        total = len(
+            result
         )
 
 
-        # MA25
-
-        fig.add_trace(
-            go.Scatter(
-                x=data.index,
-                y=data["MA25"],
-                name="MA25"
-            ),
-            row=1,
-            col=1
+        win_rate = (
+            wins /
+            total *
+            100
         )
 
 
-        # MA75
+        st.success(
+            f"""
+検証回数：{total}回
 
-        fig.add_trace(
-            go.Scatter(
-                x=data.index,
-                y=data["MA75"],
-                name="MA75"
-            ),
-            row=1,
-            col=1
-        )
-                # =============================
-        # RSI
-        # =============================
-
-        fig.add_trace(
-            go.Scatter(
-                x=data.index,
-                y=data["RSI"],
-                name="RSI"
-            ),
-            row=2,
-            col=1
+勝率：{win_rate:.1f}%
+"""
         )
 
 
-        # =============================
-        # MACD
-        # =============================
+    else:
 
-        fig.add_trace(
-            go.Scatter(
-                x=data.index,
-                y=data["MACD"],
-                name="MACD"
-            ),
-            row=3,
-            col=1
+        st.info(
+            "検証データ不足"
+        )
+        # =========================
+# Project X 総合AIスコア
+# =========================
+
+st.divider()
+
+st.subheader(
+    "🧠 Project X 総合判断"
+)
+
+
+try:
+
+    final_score = 0
+
+
+    # AI評価（最大40点）
+
+    final_score += (
+        probability * 40
+    )
+
+
+    # トレンド（最大30点）
+
+    if latest["Close"] > latest["MA25"]:
+
+        final_score += 15
+
+
+    if latest["MA25"] > latest["MA75"]:
+
+        final_score += 15
+
+
+
+    # MACD（15点）
+
+    if latest["MACD"] > latest["Signal"]:
+
+        final_score += 15
+
+
+
+    # RSI（10点）
+
+    if 40 <= latest["RSI"] <= 70:
+
+        final_score += 10
+
+
+
+    final_score = int(
+        min(
+            final_score,
+            100
+        )
+    )
+
+
+    st.metric(
+        "Project X スコア",
+        f"{final_score} / 100"
+    )
+
+
+
+    if final_score >= 80:
+
+        st.success(
+            """
+🚀 強気判定（上昇）
+
+AI・テクニカルとも良好
+"""
         )
 
 
-        fig.add_trace(
-            go.Scatter(
-                x=data.index,
-                y=data["Signal"],
-                name="Signal"
-            ),
-            row=3,
-            col=1
+    elif final_score >= 60:
+
+        st.info(
+            """
+🟡 監視候補
+
+上昇余地あり
+"""
         )
 
 
-        # =============================
-        # チャート設定
-        # =============================
+    elif final_score >= 40:
 
-        fig.update_layout(
-            height=1000,
-            xaxis_rangeslider_visible=False,
-            title=f"{code} Project X分析"
+        st.warning(
+            """
+⚪ 様子見
+
+材料確認
+"""
         )
 
 
-        st.plotly_chart(
-            fig,
+    else:
+
+        st.error(
+            """
+🟢 弱気判定（下落警戒）
+
+リスク注意
+"""
+        )
+
+
+except:
+
+    st.warning(
+        "スコア計算不可"
+    )
+    # =========================
+# 最終売買判断パネル
+# =========================
+
+st.divider()
+
+st.subheader(
+    "🚦 Project X 最終判断"
+)
+
+
+try:
+
+
+    if final_score >= 80:
+
+        decision = "🔴 BUY"
+
+        comment = """
+強気シグナル
+
+AI・テクニカルともに良好
+"""
+
+
+    elif final_score >= 60:
+
+        decision = "🟡 HOLD"
+
+        comment = """
+監視継続
+
+上昇余地あり
+"""
+
+
+    elif final_score >= 40:
+
+        decision = "⚪ WAIT"
+
+        comment = """
+様子見
+
+材料確認が必要
+"""
+
+
+    else:
+
+        decision = "🟢 SELL"
+
+        comment = """
+弱気シグナル
+
+リスク管理優先
+"""
+
+
+
+    col1,col2 = st.columns(2)
+
+
+    col1.metric(
+        "判断",
+        decision
+    )
+
+
+    col2.metric(
+        "信頼度",
+        f"{final_score}%"
+    )
+
+
+    st.info(
+        comment
+    )
+
+
+except:
+
+    st.warning(
+        "判断データ不足"
+    )
+
+# =========================
+# Version 3.1
+# Project X ダッシュボード
+# =========================
+
+st.divider()
+
+st.subheader(
+    "🚀 Project X ダッシュボード"
+)
+
+
+try:
+
+    dash1, dash2, dash3, dash4 = st.columns(4)
+
+
+    dash1.metric(
+        "現在値",
+        f"{latest['Close']:.2f}円"
+    )
+
+
+    dash2.metric(
+        "AI上昇確率",
+        f"{probability*100:.1f}%"
+    )
+
+
+    dash3.metric(
+        "総合スコア",
+        f"{final_score}/100"
+    )
+
+
+    if final_score >= 80:
+
+        dash4.error(
+            "🔴 BUY"
+        )
+
+    elif final_score >= 60:
+
+        dash4.warning(
+            "🟡 HOLD"
+        )
+
+    else:
+
+        dash4.success(
+            "🟢 WAIT"
+        )
+
+
+except:
+
+    st.info(
+        "分析後に表示されます"
+    )
+    # =========================
+# Version 3.2
+# 投資判断カード
+# =========================
+
+st.divider()
+
+st.subheader(
+    "📌 Investment Panel"
+)
+
+
+try:
+
+    if final_score >= 80:
+
+        color_message = """
+🔴 強気ゾーン
+
+買い検討レベル
+"""
+
+    elif final_score >= 60:
+
+        color_message = """
+🟡 監視ゾーン
+
+タイミング待ち
+"""
+
+    else:
+
+        color_message = """
+🟢 慎重ゾーン
+
+リスク管理優先
+"""
+
+
+    st.info(
+        color_message
+    )
+
+
+    st.write(
+        "AI分析ポイント"
+    )
+
+
+    points = []
+
+
+    if probability >= 0.65:
+
+        points.append(
+            "✅ AI上昇確率が高い"
+        )
+
+    else:
+
+        points.append(
+            "⚠ AI確率は低め"
+        )
+
+
+    if latest["Close"] > latest["MA25"]:
+
+        points.append(
+            "✅ 短期トレンド上向き"
+        )
+
+    else:
+
+        points.append(
+            "⚠ 短期トレンド弱い"
+        )
+
+
+    if latest["MACD"] > latest["Signal"]:
+
+        points.append(
+            "✅ MACD買い方向"
+        )
+
+    else:
+
+        points.append(
+            "⚠ MACD弱い"
+        )
+
+
+    for p in points:
+
+        st.write(p)
+
+
+except:
+
+    st.info(
+        "分析後に表示されます"
+    )
+    # =========================
+# Version 3.3
+# AI実績分析パネル
+# =========================
+
+st.divider()
+
+st.subheader(
+    "🏆 AI実績分析"
+)
+
+
+try:
+
+    history_file = "prediction_history.csv"
+
+
+    if os.path.exists(history_file):
+
+        history_df = pd.read_csv(
+            history_file
+        )
+
+
+        total = len(history_df)
+
+
+        st.metric(
+            "AI予測回数",
+            f"{total}回"
+        )
+
+
+        if "result" in history_df.columns:
+
+
+            win = len(
+                history_df[
+                    history_df["result"] == "WIN"
+                ]
+            )
+
+
+            lose = len(
+                history_df[
+                    history_df["result"] == "LOSE"
+                ]
+            )
+
+
+            finished = win + lose
+
+
+            if finished > 0:
+
+
+                rate = (
+                    win /
+                    finished *
+                    100
+                )
+
+
+                c1,c2,c3 = st.columns(3)
+
+
+                c1.metric(
+                    "勝率",
+                    f"{rate:.1f}%"
+                )
+
+
+                c2.metric(
+                    "勝ち",
+                    f"{win}回"
+                )
+
+
+                c3.metric(
+                    "負け",
+                    f"{lose}回"
+                )
+
+
+            else:
+
+                st.info(
+                    "まだ結果判定待ちです"
+                )
+
+
+        st.dataframe(
+            history_df,
             width="stretch"
         )
 
-                # =============================
-        # AI予測履歴
-        # =============================
 
-        st.divider()
+    else:
 
-        st.subheader("📚 AI予測履歴")
+        st.info(
+            "まだAI予測履歴がありません"
+        )
 
-        history = pd.read_csv("prediction_history.csv")
 
-        st.dataframe(history, width="stretch")
+except:
+
+    st.warning(
+        "実績分析エラー"
+    )
+    # =========================
+# Version 3.4
+# AI銘柄別成績分析
+# =========================
+
+st.divider()
+
+st.subheader(
+    "🧠 AI銘柄別成績"
+)
+
+
+try:
+
+    history_file = "prediction_history.csv"
+
+
+    if os.path.exists(history_file):
+
+        df_result = pd.read_csv(
+            history_file
+        )
+
+
+        if "code" in df_result.columns and "result" in df_result.columns:
+
+
+            result_df = df_result[
+                df_result["result"].isin(
+                    [
+                        "WIN",
+                        "LOSE"
+                    ]
+                )
+            ]
+
+
+            if len(result_df) > 0:
+
+
+                stock_result = []
+
+
+                for stock_code in result_df["code"].unique():
+
+
+                    stock_data = result_df[
+                        result_df["code"] == stock_code
+                    ]
+
+
+                    wins = len(
+                        stock_data[
+                            stock_data["result"] == "WIN"
+                        ]
+                    )
+
+
+                    total = len(
+                        stock_data
+                    )
+
+
+                    rate = (
+                        wins /
+                        total *
+                        100
+                    )
+
+
+                    stock_result.append(
+                        {
+                            "銘柄コード":
+                                stock_code,
+
+                            "予測回数":
+                                total,
+
+                            "勝率(%)":
+                                round(
+                                    rate,
+                                    1
+                                )
+                        }
+                    )
+
+
+                stock_df = pd.DataFrame(
+                    stock_result
+                )
+
+
+                stock_df = stock_df.sort_values(
+                    "勝率(%)",
+                    ascending=False
+                )
+
+
+                st.dataframe(
+                    stock_df,
+                    width="stretch"
+                )
+
+
+            else:
+
+                st.info(
+                    "判定済みデータがありません"
+                )
+
+
+        else:
+
+            st.info(
+                "分析データ不足"
+            )
+
+
+    else:
+
+        st.info(
+            "履歴なし"
+        )
+
+
+except:
+
+    st.warning(
+        "銘柄別分析エラー"
+    )
+    # =========================
+# Version 3.6
+# 仮想100万円運用シミュレーション
+# =========================
+
+st.divider()
+
+st.subheader(
+    "💰 Project X 仮想運用"
+)
+
+
+try:
+
+    start_money = 1000000
+
+
+    if os.path.exists(
+        "prediction_history.csv"
+    ):
+
+
+        sim = pd.read_csv(
+            "prediction_history.csv"
+        )
+
+
+        if "result" in sim.columns:
+
+
+            win_count = len(
+                sim[
+                    sim["result"]=="WIN"
+                ]
+            )
+
+
+            lose_count = len(
+                sim[
+                    sim["result"]=="LOSE"
+                ]
+            )
+
+
+            total = (
+                win_count +
+                lose_count
+            )
+
+
+            if total > 0:
+
+
+                win_rate = (
+                    win_count /
+                    total
+                )
+
+
+                # 1回あたり仮想利益5%
+                # 負け3%
+
+                estimated = (
+                    start_money *
+                    (
+                        1
+                        +
+                        (
+                            win_rate*0.05
+                            -
+                            (1-win_rate)*0.03
+                        )
+                        *
+                        total
+                    )
+                )
+
+
+                profit = (
+                    estimated -
+                    start_money
+                )
+
+
+                c1,c2,c3 = st.columns(3)
+
+
+                c1.metric(
+                    "開始資金",
+                    "100万円"
+                )
+
+
+                c2.metric(
+                    "評価額",
+                    f"{estimated:,.0f}円"
+                )
+
+
+                c3.metric(
+                    "損益",
+                    f"{profit:+,.0f}円"
+                )
+
+
+            else:
+
+                st.info(
+                    "まだ検証データ不足"
+                )
+
+
+        else:
+
+            st.info(
+                "結果判定待ち"
+            )
+
+
+except:
+
+    st.warning(
+        "シミュレーション計算不可"
+    )
