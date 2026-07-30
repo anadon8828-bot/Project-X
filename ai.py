@@ -7,8 +7,8 @@ class AIEngine:
 
     def __init__(self):
 
-        if not os.path.exists("model.pkl"):
-            raise FileNotFoundError("model.pkl がありません")
+        if not os.path.exists("model_small.pkl"):
+            raise FileNotFoundError("model_small.pkl がありません")
 
         self.model = joblib.load("model_small.pkl")
 
