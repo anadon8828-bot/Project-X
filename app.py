@@ -9,6 +9,8 @@ from ai import AIEngine
 from ranking import create_ranking
 from portfolio import calculate_portfolio
 from backtest import run_backtest
+from market import get_market_score
+from history import save_prediction
 
 
 # =========================
@@ -109,11 +111,85 @@ if st.button(
     latest = data.iloc[-1]
 
 
+    # =========================
+    # 反発期待度AI
+    # =========================
+
+    rebound_score = 0
+
+
+    if latest["RSI"] < 30:
+
+        rebound_score += 40
+
+
+    if latest["Close"] < latest["MA25"] * 0.95:
+
+        rebound_score += 30
+
+
+    if latest["MACD"] > latest["Signal"]:
+
+        rebound_score += 20
+
+
+    if latest["Volume"] > data["Volume"].rolling(20).mean().iloc[-1]:
+
+        rebound_score += 10
+
+
+
+    st.divider()
+
+    st.subheader(
+        "📈 反発期待度AI"
+    )
+
+
+    st.progress(
+        rebound_score / 100
+    )
+
+
+    st.metric(
+        "反発期待度",
+        f"{rebound_score}%"
+    )
+
+
+    if rebound_score >= 70:
+
+        st.success(
+            "⭐ 強い反発候補"
+        )
+
+
+    elif rebound_score >= 50:
+
+        st.warning(
+            "👀 監視候補"
+        )
+
+
+    else:
+
+        st.info(
+            "様子見"
+        )
+
+
     # AI判定
 
     probability, signal = ai.predict(
         latest
     )
+    save_prediction(
+    code,
+    latest["Close"],
+    probability,
+    final_score if "final_score" in locals() else 0,
+    signal
+)
 
 
     st.divider()
@@ -162,7 +238,12 @@ AI上昇確率：**{probability*100:.1f}%**
             "🟢 SELL"
         )
 
-    # 現在データ
+     
+
+
+
+
+        # 現在データ
 
     st.divider()
 
@@ -196,7 +277,7 @@ AI上昇確率：**{probability*100:.1f}%**
         "出来高",
         f"{int(latest['Volume']):,}"
     )
-        # =========================
+    # =========================
     # チャート表示
     # =========================
 
@@ -275,7 +356,7 @@ AI上昇確率：**{probability*100:.1f}%**
         row=3,
         col=1
     )
-    
+        
 
 
     fig.update_layout(
@@ -295,9 +376,6 @@ AI上昇確率：**{probability*100:.1f}%**
 
 st.divider()
 
-st.subheader(
-    "🏆 AIおすすめランキング"
-)
 
 
 ranking_codes = [
@@ -329,15 +407,110 @@ ranking_df = create_ranking(
     ranking_codes
 )
 
+# =========================
+# Version 4.7
+# AI注目銘柄TOP5
+# =========================
+
+st.divider()
+
+st.subheader(
+    "🚀 今日のAI注目銘柄 TOP5"
+)
+
+
+try:
+
+    top5 = ranking_df.head(5)
+
+
+    if not top5.empty:
+
+
+        st.dataframe(
+            top5,
+            width="stretch"
+        )
+
+
+        buy_list = top5[
+            top5["判断"] == "🔴 BUY"
+        ]
+
+
+        if len(buy_list) > 0:
+
+            st.success(
+                "🔥 AI買い候補あり"
+            )
+
+            for code in buy_list["コード"]:
+
+                st.write(
+                    f"⭐ {code}"
+                )
+
+
+        else:
+
+            st.info(
+                "現在強い買い候補なし"
+            )
+
+
+except:
+
+    st.info(
+        "ランキング計算後に表示されます"
+    )
 
 if not ranking_df.empty:
 
+
+    st.divider()
+
+    st.subheader(
+        "🚀 今日のAI注目銘柄 TOP5"
+    )
+
+
+    top5 = ranking_df.head(5)
+
+
     st.dataframe(
-        ranking_df,
+        top5,
         width="stretch"
     )
 
+
+    buy_list = top5[
+        top5["判断"] == "🔴 BUY"
+    ]
+
+
+    if len(buy_list) > 0:
+
+        st.success(
+            "🔥 AI買い候補あり"
+        )
+
+
+        for code in buy_list["コード"]:
+
+            st.write(
+                f"⭐ {code}"
+            )
+
+
+    else:
+
+        st.info(
+            "現在強い買い候補なし"
+        )
+
+
 else:
+
 
     st.info(
         "ランキング計算できませんでした"
@@ -669,17 +842,41 @@ AI・テクニカルともに良好
         decision
     )
 
-
     col2.metric(
         "信頼度",
         f"{final_score}%"
     )
 
-
     st.info(
         comment
     )
 
+    st.divider()
+
+    st.subheader("🎯 AI買いポイント")
+
+    buy_price = latest["MA25"]
+
+    take_profit = latest["Close"] * 1.08
+
+    stop_loss = latest["Close"] * 0.95
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric(
+        "買い目安",
+        f"{buy_price:.2f}円"
+    )
+
+    c2.metric(
+        "利確目安",
+        f"{take_profit:.2f}円"
+    )
+
+    c3.metric(
+        "損切り目安",
+        f"{stop_loss:.2f}円"
+    )
 
 except:
 
@@ -687,6 +884,8 @@ except:
         "判断データ不足"
     )
 
+
+   
 # =========================
 # Version 3.1
 # Project X ダッシュボード
@@ -1209,4 +1408,257 @@ except:
 
     st.warning(
         "シミュレーション計算不可"
+    )
+    # =========================
+# Version 4.3
+# 市場環境スコア
+# =========================
+
+st.divider()
+
+st.subheader(
+    "🌏 市場環境AI"
+)
+
+
+try:
+
+    market_score, markets = get_market_score()
+
+
+    st.metric(
+        "市場環境スコア",
+        f"{market_score}/100"
+    )
+
+
+    for name, value in markets.items():
+
+        st.write(
+            f"{name} : {value}"
+        )
+
+
+    if market_score >= 70:
+
+        st.success(
+            "🟢 全体相場は追い風"
+        )
+
+    elif market_score >= 40:
+
+        st.warning(
+            "🟡 慎重な相場"
+        )
+
+    else:
+
+        st.error(
+            "🔴 リスク高め"
+        )
+
+
+except Exception as e:
+
+    st.warning(
+        "市場分析データ取得不可"
+    )
+    # =========================
+# Version 4.3
+# 市場環境AI
+# =========================
+
+st.divider()
+
+st.subheader(
+    "🌏 市場環境AI"
+)
+
+try:
+
+    market_score, markets = get_market_score()
+
+
+    st.metric(
+        "市場環境スコア",
+        f"{market_score}/100"
+    )
+
+
+    for name, value in markets.items():
+
+        st.write(
+            f"{name} : {value}"
+        )
+
+
+    if market_score >= 70:
+
+        st.success(
+            "🟢 相場環境 良好"
+        )
+
+    elif market_score >= 40:
+
+        st.warning(
+            "🟡 慎重な相場"
+        )
+
+    else:
+
+        st.error(
+            "🔴 リスク高め"
+        )
+
+
+except:
+
+    st.info(
+        "市場データ取得待ち"
+    )
+    # =========================
+# Version 4.4
+# AIエントリーポイント判定
+# =========================
+
+st.divider()
+
+st.subheader(
+    "🎯 AIエントリーポイント"
+)
+
+
+try:
+
+    entry_score = 0
+
+    reasons = []
+
+
+    # RSI判定
+
+    if latest["RSI"] < 35:
+
+        entry_score += 30
+
+        reasons.append(
+            "✅ RSI売られすぎ"
+        )
+
+    elif latest["RSI"] < 50:
+
+        entry_score += 15
+
+        reasons.append(
+            "🟡 RSI改善余地"
+        )
+
+
+
+    # MACD判定
+
+    if latest["MACD"] > latest["Signal"]:
+
+        entry_score += 30
+
+        reasons.append(
+            "✅ MACD反転"
+        )
+
+
+    # 出来高判定
+
+    avg_volume = data["Volume"].rolling(20).mean().iloc[-1]
+
+
+    if latest["Volume"] > avg_volume:
+
+        entry_score += 20
+
+        reasons.append(
+            "✅ 出来高増加"
+        )
+
+
+    # 株価位置
+
+    if latest["Close"] < latest["MA25"]:
+
+        entry_score += 20
+
+        reasons.append(
+            "✅ 押し目位置"
+        )
+
+
+    entry_score = min(
+        entry_score,
+        100
+    )
+
+
+    st.metric(
+        "AI買い推奨度",
+        f"{entry_score}%"
+    )
+
+
+    st.progress(
+        entry_score / 100
+    )
+
+
+    if entry_score >= 70:
+
+        st.success(
+            "🚀 買い検討ゾーン"
+        )
+
+    elif entry_score >= 40:
+
+        st.warning(
+            "👀 監視ゾーン"
+        )
+
+    else:
+
+        st.info(
+            "⏸ 待機ゾーン"
+        )
+
+
+    st.write(
+        "判定理由"
+    )
+
+
+    for r in reasons:
+
+        st.write(r)
+
+
+
+    st.write(
+        f"""
+### 参考価格
+
+現在値：
+{latest['Close']:.2f}円
+
+買い目安：
+{latest['MA25']:.2f}円
+
+目標：
+{latest['Close']*1.08:.2f}円
+
+損切：
+{latest['Close']*0.95:.2f}円
+"""
+    )
+
+
+except:
+
+    st.info(
+        "分析後に表示されます"
     )

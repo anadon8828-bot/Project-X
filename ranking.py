@@ -76,7 +76,9 @@ def create_ranking(model, codes):
             )
 
 
-            data["MACD"] = ema12 - ema26
+            data["MACD"] = (
+                ema12 - ema26
+            )
 
 
             latest = data.iloc[-1]
@@ -107,35 +109,103 @@ def create_ranking(model, codes):
             )
 
 
+            # テクニカルスコア
+
+            score = 0
+
+
+            if latest["Close"] > latest["MA25"]:
+                score += 20
+
+
+            if latest["MA25"] > latest["MA75"]:
+                score += 20
+
+
+            if latest["MACD"] > 0:
+                score += 20
+
+
+            if 40 <= latest["RSI"] <= 70:
+                score += 20
+
+
+            if probability >= 0.6:
+                score += 20
+
+
+
+            total_score = int(
+                score
+            )
+
+
+            if total_score >= 80:
+
+                signal = "🔴 BUY"
+
+
+            elif total_score >= 60:
+
+                signal = "🟡 HOLD"
+
+
+            else:
+
+                signal = "🟢 WAIT"
+
+
+
             ranking.append(
                 {
                     "コード": code,
+
+                    "現在値":
+                        round(
+                            latest["Close"],
+                            1
+                        ),
+
                     "AI上昇確率(%)":
                         round(
                             probability * 100,
                             1
-                        )
+                        ),
+
+                    "総合スコア":
+                        total_score,
+
+                    "判断":
+                        signal
                 }
             )
 
 
-        except:
+        except Exception:
 
             pass
 
 
+
     if ranking:
+
 
         result = pd.DataFrame(
             ranking
         )
 
+
         result = result.sort_values(
-            "AI上昇確率(%)",
+            [
+                "総合スコア",
+                "AI上昇確率(%)"
+            ],
             ascending=False
         )
 
+
         return result
+
 
 
     return pd.DataFrame()
