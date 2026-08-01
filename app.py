@@ -118,6 +118,16 @@ if st.button(
 
     st.divider()
 
+    st.success(
+    f"""
+## 🚀 今日のAI判断
+
+### {signal}
+
+AI上昇確率：**{probability*100:.1f}%**
+"""
+)
+
     st.subheader(
         "🤖 AI予測"
     )
