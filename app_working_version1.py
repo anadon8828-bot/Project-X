@@ -13,7 +13,6 @@ from market import get_market_score
 from history import save_prediction
 from analysis import calculate_analysis
 from charts import create_chart
-from signals import calculate_rebound_score, create_signal, create_decision
 
 
 # =========================
@@ -128,10 +127,27 @@ if st.button(
     # 反発期待度AI
     # =========================
 
-    rebound_score = calculate_rebound_score(
-    data,
-    latest
-)
+    rebound_score = 0
+
+
+    if latest["RSI"] < 30:
+
+        rebound_score += 40
+
+
+    if latest["Close"] < latest["MA25"] * 0.95:
+
+        rebound_score += 30
+
+
+    if latest["MACD"] > latest["Signal"]:
+
+        rebound_score += 20
+
+
+    if latest["Volume"] > data["Volume"].rolling(20).mean().iloc[-1]:
+
+        rebound_score += 10
 
 
 

@@ -11,9 +11,6 @@ from portfolio import calculate_portfolio
 from backtest import run_backtest
 from market import get_market_score
 from history import save_prediction
-from analysis import calculate_analysis
-from charts import create_chart
-from signals import calculate_rebound_score, create_signal, create_decision
 
 
 # =========================
@@ -76,16 +73,6 @@ period = st.selectbox(
     index=1
 )
 
-# =========================
-# 分析結果保存用
-# =========================
-
-data = None
-latest = None
-probability = 0
-signal = ""
-final_score = 0
-rebound_score = 0
 
 
 # =========================
@@ -128,10 +115,27 @@ if st.button(
     # 反発期待度AI
     # =========================
 
-    rebound_score = calculate_rebound_score(
-    data,
-    latest
-)
+    rebound_score = 0
+
+
+    if latest["RSI"] < 30:
+
+        rebound_score += 40
+
+
+    if latest["Close"] < latest["MA25"] * 0.95:
+
+        rebound_score += 30
+
+
+    if latest["MACD"] > latest["Signal"]:
+
+        rebound_score += 20
+
+
+    if latest["Volume"] > data["Volume"].rolling(20).mean().iloc[-1]:
+
+        rebound_score += 10
 
 
 
@@ -176,30 +180,21 @@ if st.button(
 
     # AI判定
 
-    analysis_result = calculate_analysis(
-    data,
-    latest,
-    ai
+    probability, signal = ai.predict(
+        latest
+    )
+    save_prediction(
+    code,
+    latest["Close"],
+    probability,
+    final_score if "final_score" in locals() else 0,
+    signal
 )
 
-    probability = analysis_result["probability"]
 
-    signal = analysis_result["signal"]
+    st.divider()
 
-    if latest is not None:
-
-        save_prediction(
-        code,
-        latest["Close"],
-        probability,
-        final_score if "final_score" in locals() else 0,
-        signal
-    )
-
-
-st.divider()
-
-st.success(
+    st.success(
     f"""
 ## 🚀 今日のAI判断
 
@@ -209,10 +204,10 @@ AI上昇確率：**{probability*100:.1f}%**
 """
 )
 
-if latest is not None:
+
     st.write(
-            "### 判断理由"
-        )
+        "### 判断理由"
+    )
 
 
     reasons = []
@@ -262,6 +257,7 @@ if latest is not None:
             "⚠ RSI過熱"
         )
 
+
     if latest["Volume"] > data["Volume"].rolling(20).mean().iloc[-1]:
 
         reasons.append(
@@ -280,20 +276,90 @@ if latest is not None:
         st.write(r)
    
     # =========================
-# チャート表示
-# =========================
+    # チャート表示
+    # =========================
 
-st.divider()
+    st.divider()
 
-st.subheader(
-    "📈 Project X チャート"
-)
+    st.subheader(
+        "📈 Project X チャート"
+    )
 
 
-if data is not None:
+    fig = make_subplots(
+        rows=3,
+        cols=1,
+        shared_xaxes=True,
+        row_heights=[
+            0.5,
+            0.25,
+            0.25
+        ]
+    )
 
-    fig = create_chart(
-        data
+
+    fig.add_trace(
+        go.Candlestick(
+            x=data.index,
+            open=data["Open"],
+            high=data["High"],
+            low=data["Low"],
+            close=data["Close"],
+            name="株価"
+        ),
+        row=1,
+        col=1
+    )
+
+
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["MA25"],
+            name="MA25"
+        ),
+        row=1,
+        col=1
+    )
+
+
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["MA75"],
+            name="MA75"
+        ),
+        row=1,
+        col=1
+    )
+
+
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["RSI"],
+            name="RSI"
+        ),
+        row=2,
+        col=1
+    )
+
+
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["MACD"],
+            name="MACD"
+        ),
+        row=3,
+        col=1
+    )
+        
+
+
+    fig.update_layout(
+        height=900,
+        xaxis_rangeslider_visible=False
     )
 
 
@@ -671,7 +737,116 @@ except:
     st.warning(
         "スコア計算不可"
     )
-    
+    # =========================
+# 最終売買判断パネル
+# =========================
+
+st.divider()
+
+st.subheader(
+    "🚦 Project X 最終判断"
+)
+
+
+try:
+
+
+    if final_score >= 80:
+
+        decision = "🔴 BUY"
+
+        comment = """
+強気シグナル
+
+AI・テクニカルともに良好
+"""
+
+
+    elif final_score >= 60:
+
+        decision = "🟡 HOLD"
+
+        comment = """
+監視継続
+
+上昇余地あり
+"""
+
+
+    elif final_score >= 40:
+
+        decision = "⚪ WAIT"
+
+        comment = """
+様子見
+
+材料確認が必要
+"""
+
+
+    else:
+
+        decision = "🟢 SELL"
+
+        comment = """
+弱気シグナル
+
+リスク管理優先
+"""
+
+
+
+    col1,col2 = st.columns(2)
+
+
+    col1.metric(
+        "判断",
+        decision
+    )
+
+    col2.metric(
+        "信頼度",
+        f"{final_score}%"
+    )
+
+    st.info(
+        comment
+    )
+
+    st.divider()
+
+    st.subheader("🎯 AI買いポイント")
+
+    buy_price = latest["MA25"]
+
+    take_profit = latest["Close"] * 1.08
+
+    stop_loss = latest["Close"] * 0.95
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric(
+        "買い目安",
+        f"{buy_price:.2f}円"
+    )
+
+    c2.metric(
+        "利確目安",
+        f"{take_profit:.2f}円"
+    )
+
+    c3.metric(
+        "損切り目安",
+        f"{stop_loss:.2f}円"
+    )
+
+except:
+
+    st.warning(
+        "判断データ不足"
+    )
+
+
    
 # =========================
 # Version 3.1
@@ -866,12 +1041,64 @@ try:
         color_message
     )
 
+
+    st.write(
+        "AI分析ポイント"
+    )
+
+
+    points = []
+
+
+    if probability >= 0.65:
+
+        points.append(
+            "✅ AI上昇確率が高い"
+        )
+
+    else:
+
+        points.append(
+            "⚠ AI確率は低め"
+        )
+
+
+    if latest["Close"] > latest["MA25"]:
+
+        points.append(
+            "✅ 短期トレンド上向き"
+        )
+
+    else:
+
+        points.append(
+            "⚠ 短期トレンド弱い"
+        )
+
+
+    if latest["MACD"] > latest["Signal"]:
+
+        points.append(
+            "✅ MACD買い方向"
+        )
+
+    else:
+
+        points.append(
+            "⚠ MACD弱い"
+        )
+
+
+    for p in points:
+
+        st.write(p)
+
+
 except:
 
     st.info(
         "分析後に表示されます"
     )
-    
     # =========================
 # Version 3.3
 # AI実績分析パネル
@@ -1300,37 +1527,22 @@ st.divider()
 
 st.subheader("🚨 AIアラート")
 
-if latest is not None:
+alerts = []
 
-    alerts = []
+if latest["RSI"] < 30:
+    alerts.append("🔥 RSI30以下（売られすぎ）")
 
-    if latest["RSI"] < 30:
-        alerts.append("🔥 RSI30以下（売られすぎ）")
+if latest["MACD"] > latest["Signal"]:
+    alerts.append("📈 MACDゴールデンクロス")
 
-    if latest["MACD"] > latest["Signal"]:
-        alerts.append("📈 MACDゴールデンクロス")
+if latest["Close"] > latest["MA25"]:
+    alerts.append("✅ MA25突破")
 
-    if latest["Close"] > latest["MA25"]:
-        alerts.append("✅ MA25突破")
+if probability >= 0.70:
+    alerts.append("🤖 AI上昇確率70%以上")
 
-    if probability >= 0.70:
-        alerts.append("🤖 AI上昇確率70%以上")
-
-
-    if len(alerts) == 0:
-
-        st.info(
-            "現在大きなシグナルはありません"
-        )
-
-    else:
-
-        for alert in alerts:
-
-            st.success(alert)
-
+if len(alerts) == 0:
+    st.info("現在大きなシグナルはありません")
 else:
-
-    st.info(
-        "分析後に表示されます"
-    )
+    for alert in alerts:
+        st.success(alert)
