@@ -14,6 +14,7 @@ from history import save_prediction
 from analysis import calculate_analysis
 from charts import create_chart
 from signals import calculate_rebound_score, create_signal, create_decision
+from dashboard import show_ai_judgment
 
 
 # =========================
@@ -124,54 +125,7 @@ if st.button(
     latest = data.iloc[-1]
 
 
-    # =========================
-    # 反発期待度AI
-    # =========================
-
-    rebound_score = calculate_rebound_score(
-    data,
-    latest
-)
-
-
-
-    st.divider()
-
-    st.subheader(
-        "📈 反発期待度AI"
-    )
-
-
-    st.progress(
-        rebound_score / 100
-    )
-
-
-    st.metric(
-        "反発期待度",
-        f"{rebound_score}%"
-    )
-
-
-    if rebound_score >= 70:
-
-        st.success(
-            "⭐ 強い反発候補"
-        )
-
-
-    elif rebound_score >= 50:
-
-        st.warning(
-            "👀 監視候補"
-        )
-
-
-    else:
-
-        st.info(
-            "様子見"
-        )
+    
 
 
     # AI判定
@@ -186,7 +140,20 @@ if st.button(
 
     signal = analysis_result["signal"]
 
-    if latest is not None:
+    rebound_score = calculate_rebound_score(
+    data,
+    latest
+)
+
+signal = create_signal(
+    probability
+)
+
+decision = create_decision(
+    probability
+)
+
+if latest is not None:
 
         save_prediction(
         code,
@@ -199,85 +166,12 @@ if st.button(
 
 st.divider()
 
-st.success(
-    f"""
-## 🚀 今日のAI判断
-
-### {signal}
-
-AI上昇確率：**{probability*100:.1f}%**
-"""
+show_ai_judgment(
+    signal,
+    probability
 )
 
-if latest is not None:
-    st.write(
-            "### 判断理由"
-        )
 
-
-    reasons = []
-
-
-    if latest["Close"] > latest["MA25"]:
-
-        reasons.append(
-            "✅ 株価が短期移動平均線より上"
-        )
-
-    else:
-
-        reasons.append(
-            "⚠ 株価は短期移動平均線以下"
-        )
-
-
-    if latest["MACD"] > latest["Signal"]:
-
-        reasons.append(
-            "✅ MACD買い方向"
-        )
-
-    else:
-
-        reasons.append(
-            "⚠ MACD弱い"
-        )
-
-
-    if 40 <= latest["RSI"] <= 70:
-
-        reasons.append(
-            "✅ RSIは適正範囲"
-        )
-
-    elif latest["RSI"] < 30:
-
-        reasons.append(
-            "🔥 売られすぎ反発期待"
-        )
-
-    else:
-
-        reasons.append(
-            "⚠ RSI過熱"
-        )
-
-    if latest["Volume"] > data["Volume"].rolling(20).mean().iloc[-1]:
-
-        reasons.append(
-            "✅ 出来高増加"
-        )
-
-    else:
-
-        reasons.append(
-            "⚠ 出来高不足"
-        )
-
-
-    for r in reasons:
-
-        st.write(r)
    
     # =========================
 # チャート表示
