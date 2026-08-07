@@ -65,3 +65,50 @@ def show_dashboard(latest, probability, final_score):
         st.info(
             "分析後に表示されます"
         )
+
+def show_ai_diagnosis(latest, probability, final_score):
+
+    st.divider()
+
+    st.subheader("🧠 AI診断")
+
+    try:
+
+        if final_score >= 80:
+            grade = "★★★★★ 強気"
+        elif final_score >= 60:
+            grade = "★★★★ 期待"
+        elif final_score >= 40:
+            grade = "★★★ 中立"
+        else:
+            grade = "★★ 注意"
+
+        st.success(grade)
+
+        diagnosis = []
+
+        if probability >= 0.65:
+            diagnosis.append("✅ AI上昇確率が高い")
+        else:
+            diagnosis.append("⚠ AI上昇確率は低め")
+
+        if latest["MACD"] > latest["Signal"]:
+            diagnosis.append("✅ MACD買いシグナル")
+        else:
+            diagnosis.append("⚠ MACD弱い")
+
+        if latest["Close"] > latest["MA25"]:
+            diagnosis.append("✅ 短期トレンド上向き")
+        else:
+            diagnosis.append("⚠ 株価は移動平均以下")
+
+        if latest["RSI"] < 30:
+            diagnosis.append("🔥 売られすぎ反発期待")
+        elif latest["RSI"] > 70:
+            diagnosis.append("⚠ 過熱注意")
+
+        for item in diagnosis:
+            st.write(item)
+
+    except:
+        st.info("分析後に表示されます")

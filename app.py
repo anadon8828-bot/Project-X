@@ -14,8 +14,11 @@ from history import save_prediction
 from analysis import calculate_analysis
 from charts import create_chart
 from signals import calculate_rebound_score, create_signal, create_decision
-from dashboard import show_ai_judgment
-from dashboard import show_ai_judgment, show_dashboard
+from dashboard import (
+    show_ai_judgment,
+    show_dashboard,
+    show_ai_diagnosis
+)
 
 
 # =========================
@@ -574,145 +577,12 @@ show_dashboard(
     final_score
 )
 
-# =========================
-# Version 5.1
-# AI診断カード
-# =========================
-
-st.divider()
-
-st.subheader(
-    "🧠 AI診断"
+show_ai_diagnosis(
+    latest,
+    probability,
+    final_score
 )
 
-
-try:
-
-    if final_score >= 80:
-
-        grade = "★★★★★ 強気"
-
-    elif final_score >= 60:
-
-        grade = "★★★★ 期待"
-
-    elif final_score >= 40:
-
-        grade = "★★★ 中立"
-
-    else:
-
-        grade = "★★ 注意"
-
-
-    st.success(
-        grade
-    )
-
-
-    diagnosis = []
-
-
-    if probability >= 0.65:
-
-        diagnosis.append(
-            "✅ AI上昇確率が高い"
-        )
-
-    else:
-
-        diagnosis.append(
-            "⚠ AI上昇確率は低め"
-        )
-
-
-    if latest["MACD"] > latest["Signal"]:
-
-        diagnosis.append(
-            "✅ MACD買いシグナル"
-        )
-
-    else:
-
-        diagnosis.append(
-            "⚠ MACD弱い"
-        )
-
-
-    if latest["Close"] > latest["MA25"]:
-
-        diagnosis.append(
-            "✅ 短期トレンド上向き"
-        )
-
-    else:
-
-        diagnosis.append(
-            "⚠ 株価は移動平均以下"
-        )
-
-
-    if latest["RSI"] < 30:
-
-        diagnosis.append(
-            "🔥 売られすぎ反発期待"
-        )
-
-    elif latest["RSI"] > 70:
-
-        diagnosis.append(
-            "⚠ 過熱注意"
-        )
-
-
-    for item in diagnosis:
-
-        st.write(item)
-
-
-except:
-
-    st.info(
-        "分析後に表示されます"
-    )
-
-try:
-
-    if final_score >= 80:
-
-        color_message = """
-🔴 強気ゾーン
-
-買い検討レベル
-"""
-
-    elif final_score >= 60:
-
-        color_message = """
-🟡 監視ゾーン
-
-タイミング待ち
-"""
-
-    else:
-
-        color_message = """
-🟢 慎重ゾーン
-
-リスク管理優先
-"""
-
-
-    st.info(
-        color_message
-    )
-
-except:
-
-    st.info(
-        "分析後に表示されます"
-    )
-    
     # =========================
 # Version 3.3
 # AI実績分析パネル
