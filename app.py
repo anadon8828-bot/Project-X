@@ -15,6 +15,7 @@ from analysis import calculate_analysis
 from charts import create_chart
 from signals import calculate_rebound_score, create_signal, create_decision
 from dashboard import show_ai_judgment
+from dashboard import show_ai_judgment, show_dashboard
 
 
 # =========================
@@ -567,65 +568,11 @@ except:
     )
     
    
-# =========================
-# Version 3.1
-# Project X ダッシュボード
-# =========================
-
-st.divider()
-
-st.subheader(
-    "🚀 Project X ダッシュボード"
+show_dashboard(
+    latest,
+    probability,
+    final_score
 )
-
-
-try:
-
-    dash1, dash2, dash3, dash4 = st.columns(4)
-
-
-    dash1.metric(
-        "現在値",
-        f"{latest['Close']:.2f}円"
-    )
-
-
-    dash2.metric(
-        "AI上昇確率",
-        f"{probability*100:.1f}%"
-    )
-
-
-    dash3.metric(
-        "総合スコア",
-        f"{final_score}/100"
-    )
-
-
-    if final_score >= 80:
-
-        dash4.error(
-            "🔴 BUY"
-        )
-
-    elif final_score >= 60:
-
-        dash4.warning(
-            "🟡 HOLD"
-        )
-
-    else:
-
-        dash4.success(
-            "🟢 WAIT"
-        )
-
-
-except:
-
-    st.info(
-        "分析後に表示されます"
-    )
 
 # =========================
 # Version 5.1
