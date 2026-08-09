@@ -10,7 +10,8 @@ from ranking import create_ranking
 from portfolio import calculate_portfolio
 from backtest import run_backtest
 from market import get_market_score
-from history import save_prediction
+from history import save_prediction, show_history
+from stock_results import show_stock_results
 from analysis import calculate_analysis
 from charts import create_chart
 from signals import calculate_rebound_score, create_signal, create_decision
@@ -19,6 +20,8 @@ from dashboard import (
     show_dashboard,
     show_ai_diagnosis
 )
+from simulation import show_simulation
+from score import calculate_score
 
 
 # =========================
@@ -153,9 +156,7 @@ signal = create_signal(
     probability
 )
 
-decision = create_decision(
-    probability
-)
+
 
 if latest is not None:
 
@@ -453,63 +454,11 @@ if st.button(
         st.info(
             "検証データ不足"
         )
-        # =========================
-# Project X 総合AIスコア
-# =========================
+if latest is not None:
 
-st.divider()
-
-st.subheader(
-    "🧠 Project X 総合判断"
-)
-
-
-try:
-
-    final_score = 0
-
-
-    # AI評価（最大40点）
-
-    final_score += (
-        probability * 40
-    )
-
-
-    # トレンド（最大30点）
-
-    if latest["Close"] > latest["MA25"]:
-
-        final_score += 15
-
-
-    if latest["MA25"] > latest["MA75"]:
-
-        final_score += 15
-
-
-
-    # MACD（15点）
-
-    if latest["MACD"] > latest["Signal"]:
-
-        final_score += 15
-
-
-
-    # RSI（10点）
-
-    if 40 <= latest["RSI"] <= 70:
-
-        final_score += 10
-
-
-
-    final_score = int(
-        min(
-            final_score,
-            100
-        )
+    final_score = calculate_score(
+        latest,
+        probability
     )
 
 
@@ -519,434 +468,21 @@ try:
     )
 
 
-
-    if final_score >= 80:
-
-        st.success(
-            """
-🚀 強気判定（上昇）
-
-AI・テクニカルとも良好
-"""
-        )
-
-
-    elif final_score >= 60:
-
-        st.info(
-            """
-🟡 監視候補
-
-上昇余地あり
-"""
-        )
-
-
-    elif final_score >= 40:
-
-        st.warning(
-            """
-⚪ 様子見
-
-材料確認
-"""
-        )
-
-
-    else:
-
-        st.error(
-            """
-🟢 弱気判定（下落警戒）
-
-リスク注意
-"""
-        )
-
-
-except:
-
-    st.warning(
-        "スコア計算不可"
-    )
-    
-   
-show_dashboard(
-    latest,
-    probability,
-    final_score
-)
-
-show_ai_diagnosis(
-    latest,
-    probability,
-    final_score
-)
-
     # =========================
 # Version 3.3
 # AI実績分析パネル
 # =========================
 
-st.divider()
-
-st.subheader(
-    "🏆 AI実績分析"
-)
+show_history()
 
 
-try:
-
-    history_file = "prediction_history.csv"
+show_stock_results()
 
 
-    if os.path.exists(history_file):
-
-        history_df = pd.read_csv(
-            history_file
-        )
+show_simulation()
 
 
-        total = len(history_df)
-
-
-        st.metric(
-            "AI予測回数",
-            f"{total}回"
-        )
-
-
-        if "result" in history_df.columns:
-
-
-            win = len(
-                history_df[
-                    history_df["result"] == "WIN"
-                ]
-            )
-
-
-            lose = len(
-                history_df[
-                    history_df["result"] == "LOSE"
-                ]
-            )
-
-
-            finished = win + lose
-
-
-            if finished > 0:
-
-
-                rate = (
-                    win /
-                    finished *
-                    100
-                )
-
-
-                c1,c2,c3 = st.columns(3)
-
-
-                c1.metric(
-                    "勝率",
-                    f"{rate:.1f}%"
-                )
-
-
-                c2.metric(
-                    "勝ち",
-                    f"{win}回"
-                )
-
-
-                c3.metric(
-                    "負け",
-                    f"{lose}回"
-                )
-
-
-            else:
-
-                st.info(
-                    "まだ結果判定待ちです"
-                )
-
-
-        st.dataframe(
-            history_df,
-            width="stretch"
-        )
-
-
-    else:
-
-        st.info(
-            "まだAI予測履歴がありません"
-        )
-
-
-except:
-
-    st.warning(
-        "実績分析エラー"
-    )
-    # =========================
-# Version 3.4
-# AI銘柄別成績分析
 # =========================
-
-st.divider()
-
-st.subheader(
-    "🧠 AI銘柄別成績"
-)
-
-
-try:
-
-    history_file = "prediction_history.csv"
-
-
-    if os.path.exists(history_file):
-
-        df_result = pd.read_csv(
-            history_file
-        )
-
-
-        if "code" in df_result.columns and "result" in df_result.columns:
-
-
-            result_df = df_result[
-                df_result["result"].isin(
-                    [
-                        "WIN",
-                        "LOSE"
-                    ]
-                )
-            ]
-
-
-            if len(result_df) > 0:
-
-
-                stock_result = []
-
-
-                for stock_code in result_df["code"].unique():
-
-
-                    stock_data = result_df[
-                        result_df["code"] == stock_code
-                    ]
-
-
-                    wins = len(
-                        stock_data[
-                            stock_data["result"] == "WIN"
-                        ]
-                    )
-
-
-                    total = len(
-                        stock_data
-                    )
-
-
-                    rate = (
-                        wins /
-                        total *
-                        100
-                    )
-
-
-                    stock_result.append(
-                        {
-                            "銘柄コード":
-                                stock_code,
-
-                            "予測回数":
-                                total,
-
-                            "勝率(%)":
-                                round(
-                                    rate,
-                                    1
-                                )
-                        }
-                    )
-
-
-                stock_df = pd.DataFrame(
-                    stock_result
-                )
-
-
-                stock_df = stock_df.sort_values(
-                    "勝率(%)",
-                    ascending=False
-                )
-
-
-                st.dataframe(
-                    stock_df,
-                    width="stretch"
-                )
-
-
-            else:
-
-                st.info(
-                    "判定済みデータがありません"
-                )
-
-
-        else:
-
-            st.info(
-                "分析データ不足"
-            )
-
-
-    else:
-
-        st.info(
-            "履歴なし"
-        )
-
-
-except:
-
-    st.warning(
-        "銘柄別分析エラー"
-    )
-    # =========================
-# Version 3.6
-# 仮想100万円運用シミュレーション
-# =========================
-
-st.divider()
-
-st.subheader(
-    "💰 Project X 仮想運用"
-)
-
-
-try:
-
-    start_money = 1000000
-
-
-    if os.path.exists(
-        "prediction_history.csv"
-    ):
-
-
-        sim = pd.read_csv(
-            "prediction_history.csv"
-        )
-
-
-        if "result" in sim.columns:
-
-
-            win_count = len(
-                sim[
-                    sim["result"]=="WIN"
-                ]
-            )
-
-
-            lose_count = len(
-                sim[
-                    sim["result"]=="LOSE"
-                ]
-            )
-
-
-            total = (
-                win_count +
-                lose_count
-            )
-
-
-            if total > 0:
-
-
-                win_rate = (
-                    win_count /
-                    total
-                )
-
-
-                # 1回あたり仮想利益5%
-                # 負け3%
-
-                estimated = (
-                    start_money *
-                    (
-                        1
-                        +
-                        (
-                            win_rate*0.05
-                            -
-                            (1-win_rate)*0.03
-                        )
-                        *
-                        total
-                    )
-                )
-
-
-                profit = (
-                    estimated -
-                    start_money
-                )
-
-
-                c1,c2,c3 = st.columns(3)
-
-
-                c1.metric(
-                    "開始資金",
-                    "100万円"
-                )
-
-
-                c2.metric(
-                    "評価額",
-                    f"{estimated:,.0f}円"
-                )
-
-
-                c3.metric(
-                    "損益",
-                    f"{profit:+,.0f}円"
-                )
-
-
-            else:
-
-                st.info(
-                    "まだ検証データ不足"
-                )
-
-
-        else:
-
-            st.info(
-                "結果判定待ち"
-            )
-
-
-except:
-
-    st.warning(
-        "シミュレーション計算不可"
-    )
-    # =========================
 # Version 4.3
 # 市場環境スコア
 # =========================
