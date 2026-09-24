@@ -156,7 +156,7 @@ def render_daytrade(market,root):
         vwap_name=('日別VWAP（近似）' if daily_vwap else '表示期間VWAP（近似）')
         fig.add_trace(go.Scatter(x=chart_x,y=vwap_plot,name=vwap_name,mode='lines',connectgaps=False,line=dict(color='#ff7fbf',width=2)),row=1,col=1)
         fig.add_trace(go.Bar(x=chart_x,y=frame.Volume,name='出来高',marker_color='#526078'),row=2,col=1)
-        fig.update_layout(template='plotly_dark',height=560,xaxis_rangeslider_visible=False,margin=dict(l=8,r=8,t=20,b=8))
+        fig.update_layout(template='plotly_dark',height=480,xaxis_rangeslider_visible=False,margin=dict(l=4,r=4,t=14,b=4),legend_orientation='h')
         fig.update_xaxes(type='category',nticks=8)
         fig.update_yaxes(title_text='円' if market=='JP' else '米ドル',row=1,col=1)
         st.plotly_chart(fig,use_container_width=True)

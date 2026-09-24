@@ -58,7 +58,7 @@ def render_us_equities(load_data, load_chart_data, sakata, elliott, chart_patter
             for name in ("MA25", "MA75"):
                 fig.add_trace(go.Scatter(x=bars.index, y=bars[name], name=name), row=1, col=1)
             fig.add_trace(go.Bar(x=bars.index, y=bars.Volume, name="出来高"), row=2, col=1)
-            fig.update_layout(template="plotly_dark", height=560, margin=dict(l=8,r=8,t=20,b=8), xaxis_rangeslider_visible=False, legend_orientation="h")
+            fig.update_layout(template="plotly_dark", height=480, margin=dict(l=4,r=4,t=14,b=4), xaxis_rangeslider_visible=False, legend_orientation="h")
             fig.update_yaxes(title_text="米ドル", row=1, col=1)
             st.plotly_chart(fig, use_container_width=True, config={"scrollZoom":False,"displaylogo":False})
             st.caption(f"時間足の最終日時：{bars.index[-1]}。分足の取得期間は配信元の制約があります。")

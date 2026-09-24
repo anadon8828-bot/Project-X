@@ -324,7 +324,7 @@ def chart(data: pd.DataFrame, wave: dict | None, timeframe: str) -> go.Figure:
     fig.add_trace(go.Scatter(x=df.index, y=df.RSI, name="RSI", line=dict(color="#b083f5"), hovertemplate=f"日時: %{{x|{date_format}}}<br>RSI: %{{y:.1f}}<extra></extra>"), row=3, col=1)
     fig.add_hline(y=70, line_dash="dot", line_color="#ef4444", row=3, col=1)
     fig.add_hline(y=30, line_dash="dot", line_color="#22c55e", row=3, col=1)
-    fig.update_layout(height=630, margin=dict(l=8, r=8, t=25, b=8), xaxis_rangeslider_visible=False, legend_orientation="h", hovermode="x unified", dragmode=False, paper_bgcolor="#111c2e", plot_bgcolor="#111c2e", font=dict(color="#dbe7f6"), bargap=.08)
+    fig.update_layout(height=540, margin=dict(l=5, r=5, t=18, b=5), xaxis_rangeslider_visible=False, legend_orientation="h", hovermode="x unified", dragmode=False, paper_bgcolor="#111c2e", plot_bgcolor="#111c2e", font=dict(color="#dbe7f6"), bargap=.08)
     fig.update_xaxes(showgrid=False, tickformat="%m/%d\n%H:%M" if intraday else "%Y/%m", rangeslider_visible=False)
     fig.update_yaxes(gridcolor="rgba(151, 174, 207, .12)", zerolinecolor="rgba(151, 174, 207, .12)")
     fig.update_yaxes(title_text="株価（円）", row=1, col=1)
@@ -666,7 +666,14 @@ def require_login() -> bool:
     [data-baseweb="input"] input { color: #edf4ff; }
     .stButton > button { width: 100%; border: 0; border-radius: 11px; background: linear-gradient(135deg, #20a77c, #2fbea0); color: #061710; font-weight: 700; }
     [data-testid="stCaptionContainer"] { color: #8292a9; }
-    @media (max-width: 700px) { .block-container { padding: 18vh 1rem 2rem; } .px-login-card { padding: 1.45rem; border-radius: 18px; } .px-login-title { font-size: 1.9rem; } }
+    @media (max-width: 700px) {
+        .block-container { width: 100%; max-width: 100%; padding: 10vh .8rem 1.5rem; }
+        .px-login-card { padding: 1.25rem; border-radius: 16px; }
+        .px-login-title { font-size: 1.8rem; }
+        .px-login-copy { margin-bottom: 1.15rem; font-size: .88rem; }
+        [data-baseweb="input"] input { font-size: 16px !important; }
+        [data-testid="stFormSubmitButton"] button { min-height: 48px; font-size: 1rem; }
+    }
     </style>""", unsafe_allow_html=True)
     if not password_is_configured():
         st.warning("外部アクセス保護が未設定です。PC上で python set_project_x_password.py を実行してください。")
@@ -990,15 +997,34 @@ def main() -> None:
     .px-sidebar-mark { padding: .15rem 0 .8rem; font-size: 1.3rem; font-weight: 700; letter-spacing: -.03em; color: #f5f9ff; }
     .px-sidebar-mark span { color: var(--px-green); }
     @media (max-width: 700px) {
-        .block-container { padding: .8rem .6rem 2.5rem; }
-        .px-brand { padding: 1.1rem; margin-bottom: 1rem; border-radius: 16px; }
-        .px-brand__title { font-size: 1.65rem; }
-        [data-testid="stHorizontalBlock"] { gap: .45rem; }
-        [data-testid="stMetric"] { padding: .65rem .7rem; min-height: 88px; border-radius: 13px; }
+        html, body, [data-testid="stAppViewContainer"], .stApp { max-width: 100vw; overflow-x: hidden; }
+        [data-testid="stHeader"] { height: 3rem; }
+        .block-container { width: 100%; max-width: 100%; padding: .5rem .45rem 2rem; }
+        [data-testid="stSidebar"] { width: min(90vw, 350px) !important; }
+        [data-testid="stSidebar"] > div:first-child { width: min(90vw, 350px) !important; padding: .8rem .75rem 1.5rem; }
+        .px-brand { padding: .85rem .9rem; margin: .25rem 0 .7rem; border-radius: 14px; }
+        .px-brand__kicker { font-size: .62rem; letter-spacing: .11em; }
+        .px-brand__title { margin: .2rem 0; font-size: 1.5rem; }
+        .px-brand__sub { font-size: .78rem; line-height: 1.35; }
+        h1 { font-size: 1.55rem !important; }
+        h2 { font-size: 1.25rem !important; }
+        h3 { font-size: 1.05rem !important; }
+        p, label, [data-testid="stMarkdownContainer"] { line-height: 1.45; }
+        [data-testid="stHorizontalBlock"] { gap: .4rem; flex-wrap: wrap; }
+        [data-testid="column"] { min-width: calc(50% - .25rem) !important; flex: 1 1 calc(50% - .25rem) !important; }
+        [data-testid="stMetric"] { padding: .6rem .65rem; min-height: 84px; border-radius: 12px; }
+        [data-testid="stMetricLabel"] { font-size: .72rem; line-height: 1.25; }
         [data-testid="stMetricValue"] { font-size: 1.15rem; }
-        [data-baseweb="tab-list"] { overflow-x: auto; white-space: nowrap; }
-        [data-baseweb="tab"] { padding: .6rem .62rem; font-size: .81rem; }
-        [data-testid="stPlotlyChart"] { border-radius: 13px; }
+        [data-baseweb="tab-list"] { overflow-x: auto; white-space: nowrap; scrollbar-width: thin; }
+        [data-baseweb="tab"] { flex: 0 0 auto; padding: .55rem .6rem; font-size: .78rem; }
+        [data-baseweb="input"] input, textarea, select { font-size: 16px !important; }
+        [data-testid="stRadio"] > div { gap: .25rem .65rem; flex-wrap: wrap; }
+        .stButton > button, [data-testid="stFormSubmitButton"] > button, [data-testid="stDownloadButton"] > button { min-height: 44px; }
+        [data-testid="stDataFrame"], [data-testid="stPlotlyChart"] { width: 100% !important; max-width: calc(100vw - .9rem); border-radius: 11px; }
+        [data-testid="stDataFrame"] { font-size: .78rem; }
+        [data-testid="stPlotlyChart"] > div { width: 100% !important; }
+        [data-testid="stExpander"] details summary { min-height: 44px; }
+        [data-testid="stAlert"] { padding: .65rem .75rem; font-size: .82rem; }
     }
     </style>""", unsafe_allow_html=True)
     st.markdown("""<div class="px-brand"><div class="px-brand__kicker">JAPAN EQUITY RESEARCH · PRIVATE</div><div class="px-brand__title">Project X</div><div class="px-brand__sub">AI予測・市場環境・需給・テクニカルを、検証結果とともに確認するリサーチ環境</div></div>""", unsafe_allow_html=True)
