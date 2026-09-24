@@ -1012,10 +1012,10 @@ def main() -> None:
         p, label, [data-testid="stMarkdownContainer"] { line-height: 1.45; }
         [data-testid="stHorizontalBlock"] { gap: .38rem; flex-wrap: wrap; }
         [data-testid="column"] { min-width: 100% !important; flex: 1 1 100% !important; }
-        [data-testid="stMetric"] { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: .65rem; padding: .62rem .75rem; min-height: 64px; border-radius: 11px; }
-        [data-testid="stMetricLabel"] { grid-column: 1; grid-row: 1; margin: 0; font-size: .76rem; line-height: 1.28; }
-        [data-testid="stMetricValue"] { grid-column: 2; grid-row: 1; margin: 0; font-size: 1.08rem; text-align: right; white-space: nowrap; }
-        [data-testid="stMetricDelta"] { grid-column: 1 / -1; grid-row: 2; margin-top: .15rem; font-size: .7rem; }
+        [data-testid="stMetric"] { display: block; padding: .78rem .8rem; min-height: 88px; border-radius: 11px; }
+        [data-testid="stMetricLabel"] { display: block; margin: 0 0 .3rem; font-size: .76rem; line-height: 1.35; }
+        [data-testid="stMetricValue"] { display: block; margin: 0; font-size: 1.14rem; line-height: 1.3; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+        [data-testid="stMetricDelta"] { display: block; margin-top: .25rem; font-size: .7rem; }
         [data-baseweb="tab-list"] { overflow-x: auto; white-space: nowrap; scrollbar-width: thin; }
         [data-baseweb="tab"] { flex: 0 0 auto; padding: .55rem .6rem; font-size: .78rem; }
         [data-baseweb="input"] input, textarea, select { font-size: 16px !important; }
@@ -1029,13 +1029,38 @@ def main() -> None:
     }
     </style>""", unsafe_allow_html=True)
     st.markdown("""<div class="px-brand"><div class="px-brand__kicker">JAPAN EQUITY RESEARCH · PRIVATE</div><div class="px-brand__title">Project X</div><div class="px-brand__sub">AI予測・市場環境・需給・テクニカルを、検証結果とともに確認するリサーチ環境</div></div>""", unsafe_allow_html=True)
-    market = st.radio("対象市場", ["日本株", "米国株"], horizontal=True, key="selected_market")
-    mode = st.radio("分析モード", ["通常分析", "デイトレ"], horizontal=True, key='analysis_mode')
-    if mode == 'デイトレ':
+    if "main_menu" not in st.session_state:
+        st.session_state.main_menu = "ホーム"
+    menu_columns = st.columns(4)
+    menu_items = [
+        ("ホーム", "ホーム"),
+        ("検索", "銘柄検索"),
+        ("デイトレ", "デイトレ"),
+        ("保有・設定", "保有・設定"),
+    ]
+    for menu_column, (menu_value, menu_label) in zip(menu_columns, menu_items):
+        with menu_column:
+            if st.button(
+                menu_label,
+                key=f"main_menu_{menu_value}",
+                type="primary" if st.session_state.main_menu == menu_value else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state.main_menu = menu_value
+                if menu_value == "ホーム":
+                    st.session_state.pop("active_analysis", None)
+                st.rerun()
+    section = st.session_state.main_menu
+    st.caption(f"表示中：{section}")
+
+    market = "日本株"
+    if section in {"検索", "デイトレ"}:
+        market = st.radio("対象市場", ["日本株", "米国株"], horizontal=False, key="selected_market")
+    if section == "デイトレ":
         from daytrade_mode import render_daytrade
         render_daytrade('JP' if market == '日本株' else 'US', APP_DIR)
         return
-    if market == "米国株":
+    if section == "検索" and market == "米国株":
         from us_equities import render_us_equities
         render_us_equities(load_data, load_chart_data, sakata_patterns, elliott, chart_patterns)
         return
@@ -1055,7 +1080,8 @@ def main() -> None:
         st.session_state.max_positions = saved_settings["max_positions"]
     if "risk_per_trade" not in st.session_state:
         st.session_state.risk_per_trade = saved_settings["risk_per_trade"]
-    with st.sidebar:
+    controls_expanded = section in {"検索", "保有・設定"}
+    with st.expander("銘柄検索・保有銘柄・運用設定", expanded=controls_expanded):
         st.markdown('<div class="px-sidebar-mark">✦ Project <span>X</span></div>', unsafe_allow_html=True)
         st.header("分析条件")
         code = st.text_input("東証銘柄コード", "7203", max_chars=4).strip()
@@ -1140,6 +1166,13 @@ def main() -> None:
                         st.rerun()
                     except ValueError as exc:
                         st.error(str(exc))
+    if section == "ホーム":
+        st.session_state.pop("active_analysis", None)
+        render_home_portfolio(capital_yen, journal, max_positions)
+        return
+    if section == "保有・設定":
+        st.info("上の入力欄で保有銘柄と運用設定を登録・修正できます。")
+        return
     if go_home:
         st.session_state.pop("active_analysis", None)
         st.rerun()
