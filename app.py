@@ -1010,11 +1010,12 @@ def main() -> None:
         h2 { font-size: 1.25rem !important; }
         h3 { font-size: 1.05rem !important; }
         p, label, [data-testid="stMarkdownContainer"] { line-height: 1.45; }
-        [data-testid="stHorizontalBlock"] { gap: .4rem; flex-wrap: wrap; }
-        [data-testid="column"] { min-width: calc(50% - .25rem) !important; flex: 1 1 calc(50% - .25rem) !important; }
-        [data-testid="stMetric"] { padding: .6rem .65rem; min-height: 84px; border-radius: 12px; }
-        [data-testid="stMetricLabel"] { font-size: .72rem; line-height: 1.25; }
-        [data-testid="stMetricValue"] { font-size: 1.15rem; }
+        [data-testid="stHorizontalBlock"] { gap: .38rem; flex-wrap: wrap; }
+        [data-testid="column"] { min-width: 100% !important; flex: 1 1 100% !important; }
+        [data-testid="stMetric"] { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: .65rem; padding: .62rem .75rem; min-height: 64px; border-radius: 11px; }
+        [data-testid="stMetricLabel"] { grid-column: 1; grid-row: 1; margin: 0; font-size: .76rem; line-height: 1.28; }
+        [data-testid="stMetricValue"] { grid-column: 2; grid-row: 1; margin: 0; font-size: 1.08rem; text-align: right; white-space: nowrap; }
+        [data-testid="stMetricDelta"] { grid-column: 1 / -1; grid-row: 2; margin-top: .15rem; font-size: .7rem; }
         [data-baseweb="tab-list"] { overflow-x: auto; white-space: nowrap; scrollbar-width: thin; }
         [data-baseweb="tab"] { flex: 0 0 auto; padding: .55rem .6rem; font-size: .78rem; }
         [data-baseweb="input"] input, textarea, select { font-size: 16px !important; }
