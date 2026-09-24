@@ -4,3 +4,7 @@ pandas
 plotly
 joblib
 scikit-learn
+openpyxl
+exchange-calendars==4.13.2
+requests
+beautifulsoup4

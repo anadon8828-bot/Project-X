@@ -2,3 +2,14 @@ model.pkl
 __pycache__/
 *.pyc
 prediction_history.csv
+.project_x_auth.json
+project_x_portfolio.csv
+project_x_trade_journal.csv
+project_x_settings.json
+*.log
+*.lock
+*.sqlite
+cloudflared.exe
+market_data/
+tse_training_data.csv
+project_x_market_data.sqlite

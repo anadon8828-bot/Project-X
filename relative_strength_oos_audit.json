@@ -1,0 +1,24 @@
+{
+  "checked_at_utc": "2026-09-10T03:41:04.038005+00:00",
+  "strategy": "相対強度・月次上位10（研究用）",
+  "trades": 150,
+  "oos_periods": 15,
+  "gross_average_excess_return_pct": -0.0864824542279618,
+  "net_average_excess_return_pct_after_0_15pct_cost": -0.23648245422796166,
+  "net_win_rate_pct": 48.0,
+  "profit_factor_after_cost": 0.8597881485571888,
+  "monthly_portfolio_max_drawdown_pct": -11.4619270560123,
+  "yearly_net_average_excess_return_pct": {
+    "2025": 1.175331661450097,
+    "2026": -1.1776918646800005
+  },
+  "approval_checks": {
+    "minimum_300_trades": false,
+    "minimum_24_oos_periods": false,
+    "positive_net_excess_return": false,
+    "profit_factor_at_least_1_10": false,
+    "maximum_drawdown_better_than_minus_15pct": true
+  },
+  "status": "REJECTED",
+  "reason": "取引コスト後の平均超過リターンがマイナスで、Profit Factorも基準未満。現存銘柄だけを用いた生存者バイアスも残るため、実運用・売買推奨には使用しない。"
+}

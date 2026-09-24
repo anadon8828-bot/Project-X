@@ -1,0 +1,22 @@
+{
+  "checked_at_utc": "2026-09-14T05:39:05.052342+00:00",
+  "strategy": "市場・業種の両方を上回る相対強度・月次上位10",
+  "universe_codes": 3632,
+  "oos_periods": 15,
+  "trades": 150,
+  "gross_avg_market_excess_pct": 0.018645168007629706,
+  "gross_avg_sector_excess_pct": 0.024218532520175938,
+  "net_avg_market_excess_pct": -0.1313548319923702,
+  "profit_factor_after_cost": 0.9292087690606995,
+  "monthly_max_drawdown_pct": -9.03330124761218,
+  "status": "REJECTED",
+  "reason": "24期未満または生存者バイアス未解消のため、実運用には使用しない。",
+  "approval_checks": {
+    "minimum_300_trades": false,
+    "minimum_24_oos_periods": false,
+    "positive_net_market_excess": false,
+    "profit_factor_at_least_1_10": false,
+    "max_drawdown_better_than_minus_15pct": true,
+    "survivorship_bias_resolved": false
+  }
+}

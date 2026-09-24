@@ -1,0 +1,2 @@
+﻿holdout_start,train_rows,oos_rows,auc,brier,baseline_brier,return_mae_pct,55pct_trades,55pct_avg_return_pct,status
+2025-05-15,26100,6540,0.507009582037135,0.2516967505059469,0.2497585909934414,1.8079308773239626,649,0.144863485669996,RESEARCH_ONLY

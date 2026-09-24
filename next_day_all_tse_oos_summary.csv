@@ -1,0 +1,2 @@
+﻿holdout_start,universe_codes,train_rows,oos_rows,auc,brier,baseline_brier,mae_pct,55pct_trades,55pct_avg_return_pct,status
+2025-06-06,3632,900000,1119709,0.5470785820138395,0.24836722655777366,0.2499270786864825,1.4849350503855856,59071,0.12150116030612333,APPROVED

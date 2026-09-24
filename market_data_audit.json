@@ -1,0 +1,419 @@
+{
+  "checked_at_utc": "2026-09-14T04:56:24.047252+00:00",
+  "collection_status": {
+    "complete": 3699,
+    "empty": 1
+  },
+  "price_rows": 17395537,
+  "duplicate_code_date_keys": 0,
+  "invalid_price_rows": 10736,
+  "invalid_price_rows_from_2019": 0,
+  "adjusted_ohlc_range_candidates": 7738,
+  "codes_with_prices": 3699,
+  "short_history_codes_under_300_days": [
+    {
+      "code": "3670",
+      "rows": 3,
+      "first_date": "2026-07-17",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "7851",
+      "rows": 3,
+      "first_date": "2026-07-17",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "7985",
+      "rows": 3,
+      "first_date": "2026-07-17",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "9914",
+      "rows": 3,
+      "first_date": "2026-07-17",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "607A",
+      "rows": 29,
+      "first_date": "2026-08-04",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "603A",
+      "rows": 33,
+      "first_date": "2026-07-29",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "604A",
+      "rows": 33,
+      "first_date": "2026-07-29",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "593A",
+      "rows": 38,
+      "first_date": "2026-07-22",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "598A",
+      "rows": 41,
+      "first_date": "2026-07-16",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "589A",
+      "rows": 53,
+      "first_date": "2026-06-30",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "584A",
+      "rows": 58,
+      "first_date": "2026-06-23",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "581A",
+      "rows": 63,
+      "first_date": "2026-06-16",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "575A",
+      "rows": 74,
+      "first_date": "2026-06-01",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "559A",
+      "rows": 96,
+      "first_date": "2026-04-24",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "556A",
+      "rows": 97,
+      "first_date": "2026-04-23",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "554A",
+      "rows": 98,
+      "first_date": "2026-04-22",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "558A",
+      "rows": 98,
+      "first_date": "2026-04-22",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "550A",
+      "rows": 107,
+      "first_date": "2026-04-09",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "549A",
+      "rows": 109,
+      "first_date": "2026-04-07",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "548A",
+      "rows": 110,
+      "first_date": "2026-04-06",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "523A",
+      "rows": 112,
+      "first_date": "2026-03-27",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "542A",
+      "rows": 112,
+      "first_date": "2026-04-02",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "544A",
+      "rows": 112,
+      "first_date": "2026-04-02",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "545A",
+      "rows": 112,
+      "first_date": "2026-04-02",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "546A",
+      "rows": 112,
+      "first_date": "2026-04-02",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "519A",
+      "rows": 118,
+      "first_date": "2026-03-25",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "520A",
+      "rows": 118,
+      "first_date": "2026-03-25",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "505A",
+      "rows": 135,
+      "first_date": "2026-02-27",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "504A",
+      "rows": 138,
+      "first_date": "2026-02-24",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "500A",
+      "rows": 144,
+      "first_date": "2026-02-13",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "480A",
+      "rows": 175,
+      "first_date": "2025-12-25",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "478A",
+      "rows": 176,
+      "first_date": "2025-12-24",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "479A",
+      "rows": 176,
+      "first_date": "2025-12-24",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "483A",
+      "rows": 177,
+      "first_date": "2025-12-23",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "477A",
+      "rows": 178,
+      "first_date": "2025-12-22",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "475A",
+      "rows": 179,
+      "first_date": "2025-12-19",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "476A",
+      "rows": 179,
+      "first_date": "2025-12-19",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "485A",
+      "rows": 179,
+      "first_date": "2025-12-19",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "472A",
+      "rows": 180,
+      "first_date": "2025-12-18",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "471A",
+      "rows": 182,
+      "first_date": "2025-12-16",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "469A",
+      "rows": 184,
+      "first_date": "2025-12-12",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "462A",
+      "rows": 189,
+      "first_date": "2025-12-05",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "460A",
+      "rows": 192,
+      "first_date": "2025-12-01",
+      "last_date": "2026-09-11"
+    },
+    {
+      "code": "456A",
+      "rows": 195,
+      "first_date": "2025-11-27",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "446A",
+      "rows": 198,
+      "first_date": "2025-11-21",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "442A",
+      "rows": 210,
+      "first_date": "2025-11-05",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "441A",
+      "rows": 211,
+      "first_date": "2025-11-04",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "438A",
+      "rows": 217,
+      "first_date": "2025-10-24",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "436A",
+      "rows": 218,
+      "first_date": "2025-10-23",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "431A",
+      "rows": 222,
+      "first_date": "2025-10-17",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "429A",
+      "rows": 223,
+      "first_date": "2025-10-16",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "423A",
+      "rows": 224,
+      "first_date": "2025-10-15",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "428A",
+      "rows": 228,
+      "first_date": "2025-10-08",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "421A",
+      "rows": 230,
+      "first_date": "2025-10-06",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "414A",
+      "rows": 231,
+      "first_date": "2025-10-03",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "8729",
+      "rows": 235,
+      "first_date": "2025-09-29",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "407A",
+      "rows": 236,
+      "first_date": "2025-09-26",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "409A",
+      "rows": 237,
+      "first_date": "2025-09-25",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "410A",
+      "rows": 237,
+      "first_date": "2025-09-25",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "402A",
+      "rows": 266,
+      "first_date": "2025-08-13",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "387A",
+      "rows": 278,
+      "first_date": "2025-07-25",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "386A",
+      "rows": 282,
+      "first_date": "2025-07-18",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "378A",
+      "rows": 292,
+      "first_date": "2025-07-04",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "372A",
+      "rows": 296,
+      "first_date": "2025-06-30",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "373A",
+      "rows": 296,
+      "first_date": "2025-06-30",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "369A",
+      "rows": 298,
+      "first_date": "2025-06-26",
+      "last_date": "2026-09-14"
+    },
+    {
+      "code": "368A",
+      "rows": 299,
+      "first_date": "2025-06-25",
+      "last_date": "2026-09-14"
+    }
+  ],
+  "pass_validation_window": true,
+  "note": "調整済みOHLCは株式分割等で日中高安の整合が崩れることがあります。現在の検証は終値・出来高だけを使用します。収集完了まで検証結果は暫定扱いです。"
+}
