@@ -22,6 +22,20 @@ def expected_price_day(now=None):
     return str(session.date())
 
 
+def accepted_price_days(now=None):
+    """Accept the completed session and one provider-lagged session only.
+
+    Yahoo's delayed daily feed can remain one Tokyo session behind after the
+    close.  Keeping exactly one fallback session prevents an empty public
+    watchlist without allowing old research rows to drift forward unnoticed.
+    """
+    now = now or pd.Timestamp.now(tz="Asia/Tokyo")
+    cal = tokyo_calendar()
+    expected = pd.Timestamp(expected_price_day(now))
+    previous = cal.previous_session(expected)
+    return {str(expected.date()), str(previous.date())}
+
+
 def fresh_rows(rows, now=None):
     now = now or pd.Timestamp.now(tz="Asia/Tokyo")
     if not {"取得日時","株価基準日"}.issubset(rows.columns):
@@ -32,7 +46,7 @@ def fresh_rows(rows, now=None):
     # for the whole matching exchange session, while rejecting invalid/future
     # acquisition times.
     valid_time = fetched.notna() & fetched.le(now.tz_convert("UTC") + pd.Timedelta(minutes=5))
-    return rows[(rows["株価基準日"].astype(str)==expected_price_day(now)) & valid_time].copy()
+    return rows[rows["株価基準日"].astype(str).isin(accepted_price_days(now)) & valid_time].copy()
 
 
 def valid_materials(snapshot, now=None):

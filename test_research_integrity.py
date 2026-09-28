@@ -17,6 +17,10 @@ class ResearchIntegrity(unittest.TestCase):
         rows=pd.DataFrame([{'株価基準日':'2026-09-18','取得日時':s} for s in ['2026-09-18T14:40:00+09:00','2026-09-18T14:00:00+09:00','2026-09-18T16:00:00+09:00','bad']])
         self.assertEqual(len(fresh_rows(rows,now)),2)
         self.assertEqual(len(fresh_rows(rows,pd.Timestamp('2026-09-19T15:00:00+09:00'))),2)
+        delayed=pd.DataFrame([{'株価基準日':'2026-09-17','取得日時':'2026-09-18T14:00:00+09:00'}])
+        older=pd.DataFrame([{'株価基準日':'2026-09-16','取得日時':'2026-09-18T14:00:00+09:00'}])
+        self.assertEqual(len(fresh_rows(delayed,now)),1)
+        self.assertTrue(fresh_rows(older,now).empty)
         self.assertTrue(fresh_rows(pd.DataFrame(),now).empty)
 
     def test_price_band_selection(self):

@@ -3,6 +3,7 @@ import pandas as pd
 import streamlit as st
 import json
 import threading
+import os
 from research_rules import fresh_rows, valid_materials, assessment, expected_price_day
 
 
@@ -112,7 +113,13 @@ def render_watchlist(read_saved, root, open_stock):
         retry_allowed = pd.isna(started) or now.tz_convert("UTC") - started > wait
         heartbeat = pd.to_datetime(state.get('heartbeat',state.get('started')),utc=True,errors='coerce')
         stalled = pd.isna(heartbeat) or now.tz_convert('UTC')-heartbeat>pd.Timedelta(minutes=10)
-        if (state.get("state") != "RUNNING" or stalled) and retry_allowed:
+        # A full 3,700-name Yahoo scan repeatedly exhausts the free Render web
+        # service and makes the whole app unavailable.  Local/paid workers may
+        # refresh it; the public web process stays responsive and fail-closed.
+        cloud_free = bool(os.getenv("RENDER"))
+        if cloud_free:
+            st.info("公開版は保存済みの直近確認データを表示します。無料サーバー上の全銘柄自動更新は停止中です。")
+        elif (state.get("state") != "RUNNING" or stalled) and retry_allowed:
             start_watchlist_refresh()
             st.info("最新データの自動取得を開始しました。完了後にページを更新してください。")
         return
@@ -127,7 +134,12 @@ def render_watchlist(read_saved, root, open_stock):
     except (OSError, ValueError):
         st.warning("取得状況の集計を確認できません。全銘柄の取得成功を保証するものではありません。")
     st.caption("AI確率では足切りしません。公式開示の材料候補を最大5枠、残りはプラス条件数・売買代金順で選びます。利益の期待順位ではありません。")
-    st.caption(f"価格基準日：{expected_price_day(now)}（取引所カレンダー）。休場日・寄付前は直近営業日を使用。日足候補は同じ価格基準日の間有効です。")
+    actual_days = sorted(candidates["株価基準日"].dropna().astype(str).unique(), reverse=True) if "株価基準日" in candidates else []
+    actual_day = actual_days[0] if actual_days else "不明"
+    expected_day = expected_price_day(now)
+    st.caption(f"価格基準日：{actual_day} ／ 取引所基準の完了日：{expected_day}。日足はYahoo遅延配信です。")
+    if actual_day != expected_day:
+        st.warning("価格配信が1営業日遅れています。候補比較用として表示しますが、売買前に現在値を必ず確認してください。")
     path = root / "watchlist_fresh_candidates.csv"
     if path.exists():
         stamp = pd.Timestamp(path.stat().st_mtime, unit="s", tz="Asia/Tokyo")
