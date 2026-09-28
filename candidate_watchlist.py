@@ -49,9 +49,17 @@ def select_watchlist(candidates, limit=10, materials=None):
     rows["現在の判断"] = "比較候補（売買条件は未確認）"
     rows["注意点"] = "最新価格・材料・過熱感・損切り位置の再確認が必要。AIは選定条件に使用していません。"
     rows["売買代金"] = pd.to_numeric(rows.get("平均売買代金(百万円)", pd.Series(index=rows.index, dtype=float)), errors="coerce")
-    for index,row in rows.iterrows():
-        for key,value in assessment(row,[m for m in materials if m['code']==str(row['コード'])]).items():
-            rows.loc[index,key] = value
+    material_map = {}
+    for item in materials:
+        material_map.setdefault(str(item.get("code", "")), []).append(item)
+    assessments = [
+        assessment(row, material_map.get(str(row["コード"]), []))
+        for _, row in rows.iterrows()
+    ]
+    if assessments:
+        assessed = pd.DataFrame(assessments, index=rows.index)
+        for column in assessed.columns:
+            rows[column] = assessed[column]
     technical = rows.sort_values(["一致数", "売買代金", "コード"], ascending=[False,False,True],na_position="last")
     news = technical[technical['コード'].isin(positive_codes)]
     # Reserve up to half for sourced materials; fill remaining slots by technicals.
