@@ -25,8 +25,12 @@ def fresh_rows(rows, now=None):
     if not {"取得日時","株価基準日"}.issubset(rows.columns):
         return pd.DataFrame()
     fetched = pd.to_datetime(rows["取得日時"],utc=True,errors="coerce")
-    age = now.tz_convert("UTC")-fetched
-    return rows[(rows["株価基準日"].astype(str)==expected_price_day(now)) & age.between(pd.Timedelta(0),pd.Timedelta(minutes=30))].copy()
+    # These are confirmed daily bars, not intraday quotes.  A 30-minute expiry
+    # made a completed all-TSE scan disappear almost immediately.  Keep rows
+    # for the whole matching exchange session, while rejecting invalid/future
+    # acquisition times.
+    valid_time = fetched.notna() & fetched.le(now.tz_convert("UTC") + pd.Timedelta(minutes=5))
+    return rows[(rows["株価基準日"].astype(str)==expected_price_day(now)) & valid_time].copy()
 
 
 def valid_materials(snapshot, now=None):

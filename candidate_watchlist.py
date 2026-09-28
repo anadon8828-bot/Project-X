@@ -34,10 +34,9 @@ def select_watchlist(candidates, limit=10, materials=None):
     counts = pd.to_numeric(rows.get("テクニカル一致数", pd.Series(index=rows.index, dtype=float)), errors="coerce")
     materials = materials or []
     positive_codes = {m['code'] for m in materials if m.get('positive') is True}
-    rows = rows.loc[counts.ge(1) | rows['コード'].isin(positive_codes)].copy()
     rows["一致数"] = counts.loc[rows.index]
-    rows["候補理由"] = rows["一致数"].map(lambda n: f"価格・移動平均・MACD・出来高のプラス条件が4項目中{int(n)}項目一致")
-    rows["現在の判断"] = "買い検討候補（売買条件は未確認）"
+    rows["候補理由"] = rows["一致数"].fillna(0).map(lambda n: f"価格・移動平均・MACD・出来高のプラス条件が4項目中{int(n)}項目一致")
+    rows["現在の判断"] = "比較候補（売買条件は未確認）"
     rows["注意点"] = "最新価格・材料・過熱感・損切り位置の再確認が必要。AIは選定条件に使用していません。"
     rows["売買代金"] = pd.to_numeric(rows.get("平均売買代金(百万円)", pd.Series(index=rows.index, dtype=float)), errors="coerce")
     for index,row in rows.iterrows():
@@ -47,6 +46,38 @@ def select_watchlist(candidates, limit=10, materials=None):
     news = technical[technical['コード'].isin(positive_codes)]
     # Reserve up to half for sourced materials; fill remaining slots by technicals.
     return pd.concat([news.head(limit//2),technical]).drop_duplicates('コード').head(limit)
+
+
+PRICE_BANDS = (
+    ("1,000円未満", 0, 1_000),
+    ("1,000〜3,000円", 1_000, 3_000),
+    ("3,000〜10,000円", 3_000, 10_000),
+    ("10,000円以上", 10_000, float("inf")),
+)
+
+
+def select_by_price_band(candidates, limit=10, materials=None):
+    """Return at most ten comparable names while representing price ranges."""
+    ranked = select_watchlist(candidates, limit=max(50, limit * 5), materials=materials)
+    if ranked.empty:
+        return ranked
+    ranked = ranked.copy()
+    ranked["終値"] = pd.to_numeric(ranked.get("終値"), errors="coerce")
+    ranked = ranked.dropna(subset=["終値"])
+    picked = []
+    # Start with two from each band, then fill remaining places by rank.
+    for label, lower, upper in PRICE_BANDS:
+        band = ranked[ranked["終値"].ge(lower) & ranked["終値"].lt(upper)].head(2).copy()
+        band["価格帯"] = label
+        picked.append(band)
+    result = pd.concat(picked) if picked else ranked.iloc[0:0].copy()
+    remaining = ranked[~ranked["コード"].isin(result.get("コード", []))].head(max(0, limit - len(result))).copy()
+    for index, row in remaining.iterrows():
+        for label, lower, upper in PRICE_BANDS:
+            if lower <= row["終値"] < upper:
+                remaining.loc[index, "価格帯"] = label
+                break
+    return pd.concat([result, remaining]).drop_duplicates("コード").head(limit)
 
 
 @st.fragment(run_every="60s")
@@ -89,11 +120,11 @@ def render_watchlist(read_saved, root, open_stock):
     except (OSError, ValueError):
         st.warning("取得状況の集計を確認できません。全銘柄の取得成功を保証するものではありません。")
     st.caption("AI確率では足切りしません。公式開示の材料候補を最大5枠、残りはプラス条件数・売買代金順で選びます。利益の期待順位ではありません。")
-    st.caption(f"価格基準日：{expected_price_day(now)}（取引所カレンダー）。休場日・寄付前は直近営業日を使用。画面表示中は60秒ごとに確認し、取得から30分超のデータは非表示・再取得します。")
+    st.caption(f"価格基準日：{expected_price_day(now)}（取引所カレンダー）。休場日・寄付前は直近営業日を使用。日足候補は同じ価格基準日の間有効です。")
     path = root / "watchlist_fresh_candidates.csv"
     if path.exists():
         stamp = pd.Timestamp(path.stat().st_mtime, unit="s", tz="Asia/Tokyo")
-        st.caption(f"結果保存：{stamp:%Y/%m/%d %H:%M}。最新営業日・取得後30分以内のみ表示。遅延配信の日足であり、リアルタイム価格ではありません。")
+        st.caption(f"結果保存：{stamp:%Y/%m/%d %H:%M}。最新営業日の結果のみ表示。遅延配信の日足であり、リアルタイム価格ではありません。")
         if stamp.date() != pd.Timestamp.now(tz="Asia/Tokyo").date():
             st.warning("本日分は未更新です。以下は保存時点の候補であり、現在の買い条件成立を示しません。")
     st.info("買い条件成立：未判定。候補に入ることと、今買うことは別です。開示見出しの分類は業績への影響や市場予想を上回るサプライズの確認ではありません。")
@@ -106,7 +137,7 @@ def render_watchlist(read_saved, root, open_stock):
         st.warning('公式開示の確認可能な材料がありません。取得失敗・期限切れの場合も材料なしと断定せず、ニュース加点は行いません。')
     else:
         st.caption(f"公式開示確認：{snapshot.get('checked')} ／ 直近72時間の銘柄一致開示 {len(materials)}件。一般ニュースは未統合です。")
-    rows = select_watchlist(candidates,materials=materials)
+    rows = select_by_price_band(candidates,materials=materials)
     from candidate_history import record, render
     try:
         record(root,rows)
@@ -116,15 +147,24 @@ def render_watchlist(read_saved, root, open_stock):
     names = dict(zip(universe.get("コード", []), universe.get("銘柄名", [])))
     if rows.empty:
         st.info("保存データからプラス条件のある候補を抽出できませんでした。市場全体に候補がないという意味ではありません。")
-    for position, (_, row) in enumerate(rows.iterrows(), 1):
-        code = str(row["コード"])
-        if st.button(f"{code}　{names.get(code, row.get('銘柄名', '会社名未取得'))}", key=f"home_rank_open_{position}_{code}", use_container_width=True):
-            open_stock(code)
-            st.rerun(scope="app")
-        st.write(f"候補理由：{row['候補理由']}")
-        for item in [m for m in materials if m['code']==code]:
-            st.link_button(f"{item['category']}：{item['title']}（{item['published']}／TDnet原文）",item['url'])
-        st.caption(f"取得日時：{row.get('取得日時', '不明')}")
-        st.caption(f"現在の判断：{row['現在の判断']} ／ 注意点：{row['注意点']}")
-        if "株価基準日" in row and pd.notna(row["株価基準日"]):
-            st.caption(f"株価基準日：{row['株価基準日']}")
+    position = 0
+    for label, _, _ in PRICE_BANDS:
+        band_rows = rows[rows.get("価格帯", pd.Series(index=rows.index, dtype=str)) == label]
+        if band_rows.empty:
+            continue
+        st.markdown(f"#### {label}")
+        for _, row in band_rows.iterrows():
+            position += 1
+            code = str(row["コード"])
+            price = pd.to_numeric(row.get("終値"), errors="coerce")
+            price_text = f"{price:,.0f}円" if pd.notna(price) else "株価未取得"
+            if st.button(f"{code}　{names.get(code, row.get('銘柄名', '会社名未取得'))}　｜　{price_text}", key=f"home_rank_open_{position}_{code}", use_container_width=True):
+                open_stock(code)
+                st.rerun(scope="app")
+            st.write(f"候補理由：{row['候補理由']}")
+            for item in [m for m in materials if m['code']==code]:
+                st.link_button(f"{item['category']}：{item['title']}（{item['published']}／TDnet原文）",item['url'])
+            st.caption(f"取得日時：{row.get('取得日時', '不明')}")
+            st.caption(f"現在の判断：{row['現在の判断']} ／ 注意点：{row['注意点']}")
+            if "株価基準日" in row and pd.notna(row["株価基準日"]):
+                st.caption(f"株価基準日：{row['株価基準日']}")
