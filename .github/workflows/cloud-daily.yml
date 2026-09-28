@@ -3,8 +3,8 @@ name: Project X cloud daily update
 on:
   workflow_dispatch:
   schedule:
-    # 16:40 JST on Tokyo weekdays. Jobs also validate exchange dates themselves.
-    - cron: "40 7 * * 1-5"
+    # 18:15 JST on Tokyo weekdays, after adjusted daily bars are normally final.
+    - cron: "15 9 * * 1-5"
 
 concurrency:
   group: project-x-cloud-daily

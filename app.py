@@ -535,6 +535,15 @@ def next_day_forecast(code: str, data: pd.DataFrame) -> dict | None:
     if summary.get("status") != "APPROVED":
         return None
     try:
+        from next_day_feedback import latest_saved_forecast, load_calibration
+        prediction_date = pd.Timestamp(data.index[-1]).strftime("%Y-%m-%d")
+        saved = latest_saved_forecast(APP_DIR, code, prediction_date)
+        if saved:
+            mae = float(summary["mae_pct"]) / 100
+            close = float(data["Close"].iloc[-1])
+            expected = saved["expected_pct"] / 100
+            calibration = load_calibration(APP_DIR)
+            return {**saved, "low": close * (1 + expected - mae), "high": close * (1 + expected + mae), "calibration_status": calibration.get("status", "COLLECTING"), "settled_predictions": calibration.get("settled", 0)}
         from tse_universe import load_universe
         universe = load_universe()[["コード", "業種"]].rename(columns={"コード": "code", "業種": "sector"})
         sector = universe.loc[universe["code"].astype(str).str.upper() == code, "sector"].iloc[0]
@@ -555,9 +564,12 @@ def next_day_forecast(code: str, data: pd.DataFrame) -> dict | None:
         cols = FEATURES + ["market_today", "sector_today", "relative_sector_today"]
         probability = float(joblib.load(NEXT_DAY_DIRECTION_PATH).predict_proba(row[cols])[:, 1][0])
         expected = float(joblib.load(NEXT_DAY_RETURN_PATH).predict(row[cols])[0])
+        from next_day_feedback import apply_calibration
+        probability, expected_pct, calibration = apply_calibration(APP_DIR, probability, expected * 100)
+        expected = expected_pct / 100
         mae = float(summary["mae_pct"]) / 100
         close = float(data["Close"].iloc[-1])
-        return {"probability": probability, "expected_pct": expected * 100, "low": close * (1 + expected - mae), "high": close * (1 + expected + mae)}
+        return {"probability": probability, "expected_pct": expected * 100, "low": close * (1 + expected - mae), "high": close * (1 + expected + mae), "calibration_status": calibration.get("status", "COLLECTING"), "settled_predictions": calibration.get("settled", 0)}
     except Exception:
         return None
 

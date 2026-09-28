@@ -81,6 +81,8 @@ def main():
         return
     started = pd.Timestamp.now(tz="Asia/Tokyo").isoformat()
     rows, failed, excluded = [], 0, 0
+    from next_day_feedback import DailyFeedback
+    feedback = DailyFeedback(ROOT)
     try:
         status(state="RUNNING", started=started, processed=0)
         universe = prioritize_universe(load_universe(refresh=True))
@@ -99,6 +101,7 @@ def main():
                     if len(frame) < 76 or str(frame.index[-1].date()) != expected_price_day(now):
                         failed += 1
                         continue
+                    feedback.observe(code, stock.get("業種", "不明"), frame)
                     close, volume = frame.Close, frame.Volume
                     ma25, ma75 = close.rolling(25).mean(), close.rolling(75).mean()
                     macd = close.ewm(span=12, adjust=False).mean() - close.ewm(span=26, adjust=False).mean()
@@ -131,7 +134,11 @@ def main():
         from research_rules import fresh_rows, valid_materials
         record(ROOT,select_watchlist(fresh_rows(pd.DataFrame(rows)),materials=valid_materials(materials)))
         settle(ROOT)
-        status(state="COMPLETED",started=started,finished=pd.Timestamp.now(tz="Asia/Tokyo").isoformat(),processed=len(universe),total=len(universe),eligible=len(rows),failed=failed,excluded=excluded)
+        feedback_status = feedback.finalize(
+            ROOT / "model_next_day_all_tse_direction.pkl",
+            ROOT / "model_next_day_all_tse_return.pkl",
+        )
+        status(state="COMPLETED",started=started,finished=pd.Timestamp.now(tz="Asia/Tokyo").isoformat(),processed=len(universe),total=len(universe),eligible=len(rows),failed=failed,excluded=excluded,next_day_feedback=feedback_status)
     except Exception as exc:
         status(state="FAILED",started=started,error=str(exc))
         raise
