@@ -1,16 +1,19 @@
 """Read-only home views of saved research results."""
 from pathlib import Path
+from io import BytesIO
 import pandas as pd
 import streamlit as st
+from persistent_store import read_bytes
 
 ROOT = Path(__file__).resolve().parent
 
 def read_saved(name):
     path = ROOT / name
-    if not path.exists():
+    payload = read_bytes(path)
+    if payload is None:
         return pd.DataFrame()
     try:
-        return pd.read_csv(path, encoding="utf-8-sig", dtype={"コード": str, "code": str})
+        return pd.read_csv(BytesIO(payload), encoding="utf-8-sig", dtype={"コード": str, "code": str})
     except (OSError, ValueError, pd.errors.ParserError) as exc:
         st.warning(f"保存データを読み込めません: {name} ({exc})")
         return pd.DataFrame()

@@ -1,9 +1,11 @@
 """Persistent, validated cash-account portfolio storage for Project X."""
 
 from pathlib import Path
+from io import BytesIO
 import re
 
 import pandas as pd
+from persistent_store import read_bytes, write_bytes
 
 
 PORTFOLIO_PATH = Path(__file__).resolve().parent / "project_x_portfolio.csv"
@@ -26,10 +28,11 @@ def _code(value: object) -> str:
 
 def load_portfolio() -> pd.DataFrame:
     """Load the saved portfolio. A missing file is an empty portfolio, not an error."""
-    if not PORTFOLIO_PATH.exists():
+    payload = read_bytes(PORTFOLIO_PATH)
+    if payload is None:
         return _empty()
     try:
-        data = pd.read_csv(PORTFOLIO_PATH, encoding="utf-8-sig", dtype={"コード": "string"})
+        data = pd.read_csv(BytesIO(payload), encoding="utf-8-sig", dtype={"コード": "string"})
     except (OSError, pd.errors.ParserError) as exc:
         raise ValueError(f"ポートフォリオを読み込めませんでした: {exc}") from exc
     for column in COLUMNS:
@@ -46,7 +49,7 @@ def save_portfolio(data: pd.DataFrame) -> pd.DataFrame:
     cleaned["コード"] = cleaned["コード"].fillna("").astype(str).str.strip()
     cleaned = cleaned[cleaned["コード"] != ""].copy()
     if cleaned.empty:
-        _empty().to_csv(PORTFOLIO_PATH, index=False, encoding="utf-8-sig")
+        write_bytes(PORTFOLIO_PATH, _empty().to_csv(index=False).encode("utf-8-sig"))
         return _empty()
     cleaned["コード"] = cleaned["コード"].map(_code)
     cleaned["銘柄名"] = cleaned["銘柄名"].fillna("").astype(str).str.strip()
@@ -68,7 +71,7 @@ def save_portfolio(data: pd.DataFrame) -> pd.DataFrame:
     # entry prices, credit expiries and stop levels for additional purchases.
     cleaned["株数"] = cleaned["株数"].astype(int)
     cleaned[["取得単価", "損切り価格"]] = cleaned[["取得単価", "損切り価格"]].fillna(0).round(2)
-    cleaned.to_csv(PORTFOLIO_PATH, index=False, encoding="utf-8-sig")
+    write_bytes(PORTFOLIO_PATH, cleaned.to_csv(index=False).encode("utf-8-sig"))
     return cleaned.reset_index(drop=True)
 
 

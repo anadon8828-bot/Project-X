@@ -786,11 +786,16 @@ def rank_stocks(model, model2) -> pd.DataFrame:
 
 
 def archive_ranking(ranking: pd.DataFrame) -> pd.DataFrame:
+    from io import BytesIO
+    from persistent_store import read_bytes, write_bytes
     saved = ranking.copy()
     saved.insert(0, "分析日時", pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"))
     saved.insert(1, "順位", range(1, len(saved) + 1))
-    write_header = not RANKING_HISTORY_PATH.exists()
-    saved.to_csv(RANKING_HISTORY_PATH, mode="a", header=write_header, index=False, encoding="utf-8-sig")
+    existing = read_bytes(RANKING_HISTORY_PATH)
+    if existing:
+        prior = pd.read_csv(BytesIO(existing), encoding="utf-8-sig")
+        saved = pd.concat([prior, saved], ignore_index=True)
+    write_bytes(RANKING_HISTORY_PATH, saved.to_csv(index=False).encode("utf-8-sig"))
     return saved
 
 

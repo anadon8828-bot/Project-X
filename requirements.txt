@@ -8,3 +8,4 @@ openpyxl
 exchange-calendars==4.13.2
 requests
 beautifulsoup4
+psycopg[binary]>=3.2,<4

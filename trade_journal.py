@@ -1,8 +1,10 @@
 """Persistent, local-only trade-plan journal for Project X."""
 
 from pathlib import Path
+from io import BytesIO
 
 import pandas as pd
+from persistent_store import read_bytes, write_bytes
 
 
 FILE = Path(__file__).resolve().parent / "project_x_trade_journal.csv"
@@ -10,9 +12,10 @@ COLUMNS = ["date", "mode", "code", "action", "status", "entry", "stop", "target"
 
 
 def load_journal() -> pd.DataFrame:
-    if not FILE.exists():
+    payload = read_bytes(FILE)
+    if payload is None:
         return pd.DataFrame(columns=COLUMNS)
-    frame = pd.read_csv(FILE)
+    frame = pd.read_csv(BytesIO(payload))
     return frame.reindex(columns=COLUMNS)
 
 
@@ -86,7 +89,8 @@ def add_plan(code: str, plan, mode: str = "PAPER") -> None:
         "shares": plan.suggested_shares, "max_loss_yen": round(plan.maximum_loss_yen, 0),
         "reason": plan.reason, "exit_price": "", "realized_return": "",
     }])
-    pd.concat([frame, row], ignore_index=True).to_csv(FILE, index=False, encoding="utf-8-sig")
+    saved = pd.concat([frame, row], ignore_index=True)
+    write_bytes(FILE, saved.to_csv(index=False).encode("utf-8-sig"))
 
 
 def open_plan(row_index: int) -> None:
@@ -98,7 +102,7 @@ def open_plan(row_index: int) -> None:
     if frame.loc[row_index, "action"] != "買い候補":
         raise ValueError("見送り・監視の計画は保有開始できません。")
     frame.loc[row_index, "status"] = "OPEN"
-    frame.to_csv(FILE, index=False, encoding="utf-8-sig")
+    write_bytes(FILE, frame.to_csv(index=False).encode("utf-8-sig"))
 
 
 def close_plan(row_index: int, exit_price: float) -> None:
@@ -113,7 +117,7 @@ def close_plan(row_index: int, exit_price: float) -> None:
     frame.loc[row_index, "status"] = "CLOSED"
     frame.loc[row_index, "exit_price"] = round(exit_price, 2)
     frame.loc[row_index, "realized_return"] = round((exit_price / entry - 1) * 100, 4)
-    frame.to_csv(FILE, index=False, encoding="utf-8-sig")
+    write_bytes(FILE, frame.to_csv(index=False).encode("utf-8-sig"))
 
 
 def position_status(current_price: float, stop: float, target: float) -> str:

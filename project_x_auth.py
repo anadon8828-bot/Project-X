@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 from pathlib import Path
+from persistent_store import read_bytes, write_bytes
 
 
 AUTH_FILE = Path(__file__).resolve().parent / ".project_x_auth.json"
@@ -17,16 +18,15 @@ def public_research_enabled() -> bool:
     if override is not None:
         return override.strip().lower() in {"1", "true", "yes", "on"}
     try:
-        return bool(json.loads(ACCESS_FILE.read_text(encoding="utf-8")).get("public_research", False))
+        payload = read_bytes(ACCESS_FILE)
+        return bool(json.loads(payload.decode("utf-8")).get("public_research", False)) if payload else False
     except (OSError, ValueError, json.JSONDecodeError):
         return False
 
 
 def save_public_research(enabled: bool) -> bool:
     """Persist the local access preference atomically."""
-    temp = ACCESS_FILE.with_suffix(".tmp")
-    temp.write_text(json.dumps({"public_research": bool(enabled)}, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(temp, ACCESS_FILE)
+    write_bytes(ACCESS_FILE, json.dumps({"public_research": bool(enabled)}, ensure_ascii=False, indent=2).encode("utf-8"))
     return bool(enabled)
 
 

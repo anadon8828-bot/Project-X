@@ -11,3 +11,7 @@ services:
         value: 3.12.8
       - key: PROJECT_X_PASSWORD
         sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: PROJECT_X_ENV
+        value: production

@@ -7,6 +7,7 @@ import yfinance as yf
 from verified_materials import collect_materials
 from research_rules import expected_price_day
 from tse_universe import load_universe
+from persistent_store import write_bytes
 
 ROOT = Path(__file__).resolve().parent
 
@@ -45,9 +46,7 @@ def release_lock(path, descriptor):
 
 def write_candidates(rows):
     path = ROOT / "watchlist_fresh_candidates.csv"
-    temp = path.with_suffix(".tmp")
-    pd.DataFrame(rows).to_csv(temp, index=False, encoding="utf-8-sig")
-    os.replace(temp, path)
+    write_bytes(path, pd.DataFrame(rows).to_csv(index=False).encode("utf-8-sig"))
 
 
 def prioritize_universe(universe):
@@ -72,9 +71,7 @@ def prioritize_universe(universe):
 def status(**values):
     values["heartbeat"] = pd.Timestamp.now(tz="Asia/Tokyo").isoformat()
     path = ROOT / "watchlist_update_status.json"
-    temp = path.with_suffix(".tmp")
-    temp.write_text(json.dumps(values, ensure_ascii=False), encoding="utf-8")
-    os.replace(temp, path)
+    write_bytes(path, json.dumps(values, ensure_ascii=False).encode("utf-8"))
 
 
 def main():
@@ -89,9 +86,7 @@ def main():
         universe = prioritize_universe(load_universe(refresh=True))
         materials = {"state":"RUNNING","checked":pd.Timestamp.now(tz="Asia/Tokyo").isoformat(),"records":[]}
         news_path = ROOT / "verified_materials.json"
-        news_temp = news_path.with_suffix(".tmp")
-        news_temp.write_text(json.dumps(materials,ensure_ascii=False),encoding="utf-8")
-        os.replace(news_temp,news_path)
+        write_bytes(news_path, json.dumps(materials,ensure_ascii=False).encode("utf-8"))
         for offset in range(0, len(universe), 60):
             batch = universe.iloc[offset:offset+60]
             tickers = [f"{c}.T" for c in batch["コード"]]
@@ -130,8 +125,7 @@ def main():
             materials = {"state":"COMPLETED","checked":pd.Timestamp.now(tz="Asia/Tokyo").isoformat(),"records":records}
         except Exception as exc:
             materials = {"state":"FAILED","checked":pd.Timestamp.now(tz="Asia/Tokyo").isoformat(),"records":[],"error":str(exc)}
-        news_temp.write_text(json.dumps(materials,ensure_ascii=False),encoding="utf-8")
-        os.replace(news_temp,news_path)
+        write_bytes(news_path, json.dumps(materials,ensure_ascii=False).encode("utf-8"))
         from candidate_watchlist import select_watchlist
         from candidate_history import record, settle
         from research_rules import fresh_rows, valid_materials

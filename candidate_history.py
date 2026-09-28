@@ -4,10 +4,25 @@ import json
 import hashlib
 import pandas as pd
 from research_rules import tokyo_calendar
+from persistent_store import read_bytes, write_bytes
+
+
+def _database_path(root):
+    path = root/'candidate_observations.sqlite'
+    payload = read_bytes(path)
+    if payload is not None and (not path.exists() or path.read_bytes() != payload):
+        path.write_bytes(payload)
+    return path
+
+
+def _save_database(root):
+    path = root/'candidate_observations.sqlite'
+    if path.exists():
+        write_bytes(path, path.read_bytes())
 
 
 def connect(root):
-    db=sqlite3.connect(root/'candidate_observations.sqlite',timeout=20)
+    db=sqlite3.connect(_database_path(root),timeout=20)
     db.execute('CREATE TABLE IF NOT EXISTS snapshots (id TEXT PRIMARY KEY, recorded TEXT NOT NULL, payload TEXT NOT NULL)')
     db.execute('CREATE TABLE IF NOT EXISTS outcomes (id TEXT, code TEXT, payload TEXT, PRIMARY KEY(id,code))')
     return db
@@ -24,6 +39,7 @@ def record(root,rows):
             db.execute('INSERT OR IGNORE INTO snapshots VALUES (?,?,?)',(key,pd.Timestamp.now(tz='Asia/Tokyo').isoformat(),payload))
     finally:
         db.close()
+        _save_database(root)
 
 
 def evaluate_prices(recorded,prices,now):
@@ -81,6 +97,7 @@ def settle(root):
                     db.execute('INSERT OR REPLACE INTO outcomes VALUES (?,?,?)',(key,code,json.dumps(result,ensure_ascii=False)))
     finally:
         db.close()
+        _save_database(root)
 
 
 def render(root):

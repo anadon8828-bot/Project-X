@@ -9,6 +9,7 @@ import numpy as np
 import exchange_calendars as xcals
 import yfinance as yf
 from vwap_chart import with_vwap
+from persistent_store import read_bytes, write_bytes
 
 US_SYMBOLS='AAPL MSFT NVDA AMZN META GOOGL TSLA AMD AVGO NFLX PLTR COIN MSTR INTC MU QCOM ARM ORCL CRM UBER JPM BAC GS XOM CVX WMT COST DIS PYPL SOFI'.split()
 JP_DETAIL_LIMIT=120
@@ -110,9 +111,7 @@ def scan(market,root):
                 pass
     payload={'created':pd.Timestamp.now(tz='UTC').isoformat(),'price_day':expected,'target_day':target,'universe':len(names),'detail_universe':len(symbols),'selection_source':selection_source,'eligible':len(rows),'errors':failed,'rows':selected}
     path=root/f'daytrade_{market}.json'
-    temp=path.with_suffix('.tmp')
-    temp.write_text(json.dumps(payload,ensure_ascii=False,allow_nan=False),encoding='utf-8')
-    os.replace(temp,path)
+    write_bytes(path,json.dumps(payload,ensure_ascii=False,allow_nan=False).encode('utf-8'))
 
 
 def render_daytrade(market,root):
@@ -133,7 +132,8 @@ def render_daytrade(market,root):
                 st.error(f'候補更新に失敗：{exc}')
                 return
     try:
-        payload=json.loads((root/f'daytrade_{market}.json').read_text(encoding='utf-8'))
+        saved=read_bytes(root/f'daytrade_{market}.json')
+        payload=json.loads(saved.decode('utf-8')) if saved else {}
     except (OSError,ValueError):
         st.info('候補は未作成です。上のボタンで作成してください。')
         return

@@ -4,6 +4,8 @@ import streamlit as st
 import json
 import threading
 import os
+from io import BytesIO
+from persistent_store import read_bytes
 from research_rules import fresh_rows, valid_materials, assessment, expected_price_day
 
 
@@ -18,8 +20,10 @@ def start_watchlist_refresh():
 def render_candidate_detail(root, code):
     st.subheader("候補理由・売買条件（ホームと共通）")
     try:
-        prices = fresh_rows(pd.read_csv(root / 'watchlist_fresh_candidates.csv',dtype={'コード':str}))
-        snapshot = json.loads((root / 'verified_materials.json').read_text(encoding='utf-8'))
+        price_payload = read_bytes(root / 'watchlist_fresh_candidates.csv')
+        prices = fresh_rows(pd.read_csv(BytesIO(price_payload),dtype={'コード':str})) if price_payload else pd.DataFrame()
+        material_payload = read_bytes(root / 'verified_materials.json')
+        snapshot = json.loads(material_payload.decode('utf-8')) if material_payload else {}
     except (OSError,ValueError):
         st.warning('共通の最新判定を取得できません。売買条件は判定不可です。')
         return
@@ -110,9 +114,10 @@ def render_watchlist(read_saved, root, open_stock):
         import json
         path = root / "watchlist_update_status.json"
         state = {}
-        if path.exists():
+        status_payload = read_bytes(path)
+        if status_payload:
             try:
-                state = json.loads(path.read_text(encoding="utf-8"))
+                state = json.loads(status_payload.decode("utf-8"))
                 st.caption(f"更新状態：{ {'RUNNING':'取得中','FAILED':'更新失敗','COMPLETED':'取得終了'}.get(state.get('state'),'未確認')} ／ 処理済み：{state.get('processed',0)} / {state.get('total','確認中')}")
             except (OSError, ValueError):
                 st.caption("更新状況を確認できません。")
@@ -137,7 +142,8 @@ def render_watchlist(read_saved, root, open_stock):
     st.caption(f"対象一覧：{len(universe):,}銘柄 ／ 保存済み一次候補：{len(candidates):,}銘柄。ETF・REIT、取得不可・流動性不足・履歴不足は対象外です。")
     import json
     try:
-        state = json.loads((root / "watchlist_update_status.json").read_text(encoding="utf-8"))
+        status_payload = read_bytes(root / "watchlist_update_status.json")
+        state = json.loads(status_payload.decode("utf-8")) if status_payload else {}
         st.caption(f"今回の取得：処理 {state.get('processed',0):,}銘柄 ／ 取得不可・古い足・履歴不足 {state.get('failed',0):,}銘柄 ／ 流動性条件除外 {state.get('excluded',0):,}銘柄")
     except (OSError, ValueError):
         st.warning("取得状況の集計を確認できません。全銘柄の取得成功を保証するものではありません。")
@@ -156,7 +162,8 @@ def render_watchlist(read_saved, root, open_stock):
             st.warning("本日分は未更新です。以下は保存時点の候補であり、現在の買い条件成立を示しません。")
     st.info("買い条件成立：未判定。候補に入ることと、今買うことは別です。開示見出しの分類は業績への影響や市場予想を上回るサプライズの確認ではありません。")
     try:
-        snapshot = json.loads((root / 'verified_materials.json').read_text(encoding='utf-8'))
+        material_payload = read_bytes(root / 'verified_materials.json')
+        snapshot = json.loads(material_payload.decode('utf-8')) if material_payload else {}
     except (OSError,ValueError):
         snapshot = {}
     materials = valid_materials(snapshot,now)

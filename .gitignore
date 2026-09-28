@@ -9,6 +9,11 @@ project_x_settings.json
 *.log
 *.lock
 *.sqlite
+.env
+.env.*
+!.env.example
+.local_backups/
+project_x_state_backup_*.zip
 cloudflared.exe
 market_data/
 tse_training_data.csv
