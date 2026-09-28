@@ -2,7 +2,16 @@
 import pandas as pd
 import streamlit as st
 import json
+import threading
 from research_rules import fresh_rows, valid_materials, assessment, expected_price_day
+
+
+def start_watchlist_refresh():
+    """Start the portable in-process worker used by Windows and Render."""
+    from refresh_watchlist import main
+    worker = threading.Thread(target=main, name="project-x-watchlist", daemon=True)
+    worker.start()
+    return worker
 
 
 def render_candidate_detail(root, code):
@@ -104,10 +113,7 @@ def render_watchlist(read_saved, root, open_stock):
         heartbeat = pd.to_datetime(state.get('heartbeat',state.get('started')),utc=True,errors='coerce')
         stalled = pd.isna(heartbeat) or now.tz_convert('UTC')-heartbeat>pd.Timedelta(minutes=10)
         if (state.get("state") != "RUNNING" or stalled) and retry_allowed:
-            import subprocess
-            import sys
-            with (root / "watchlist_refresh.log").open("a", encoding="utf-8") as log:
-                subprocess.Popen([sys.executable, str(root / "refresh_watchlist.py")], cwd=root, stdout=log, stderr=log, creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+            start_watchlist_refresh()
             st.info("最新データの自動取得を開始しました。完了後にページを更新してください。")
         return
     universe = read_saved("tse_domestic_common_stocks.csv")
