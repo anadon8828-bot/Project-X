@@ -15,9 +15,16 @@ def read_saved(name):
         st.warning(f"保存データを読み込めません: {name} ({exc})")
         return pd.DataFrame()
 
+def activate_ranked_stock(state, code):
+    """Move from a home recommendation to the matching research page."""
+    state["active_analysis"] = {"code": str(code).strip().upper(), "period_name": "1年"}
+    # The top-level menu otherwise renders Home first and clears active_analysis.
+    state["main_menu"] = "検索"
+
+
 def open_ranked_stock(code):
     """Set navigation before the next full application render."""
-    st.session_state.active_analysis = {"code": code, "period_name": "1年"}
+    activate_ranked_stock(st.session_state, code)
 
 
 def render_legacy_ranking():

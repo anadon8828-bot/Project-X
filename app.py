@@ -906,7 +906,9 @@ def render_home_portfolio(capital_yen: float, journal: pd.DataFrame, max_positio
             if st.form_submit_button("保有銘柄を登録", type="primary", use_container_width=True):
                 try:
                     expiry_value = home_expiry.isoformat() if home_type != "現物" else ""
-                    first_holding = pd.DataFrame([{"コード": home_code, "銘柄名": home_name, "取引区分": home_type, "信用期限": expiry_value, "株数": home_shares, "取得単価": home_entry, "損切り価格": home_stop}])
+                    resolved_name = company_display_name(home_code)
+                    holding_name = home_name.strip() or ("" if resolved_name == "会社名未取得" else resolved_name)
+                    first_holding = pd.DataFrame([{"コード": home_code, "銘柄名": holding_name, "取引区分": home_type, "信用期限": expiry_value, "株数": home_shares, "取得単価": home_entry, "損切り価格": home_stop}])
                     st.session_state.holdings = add_holding(first_holding)
                     st.session_state.pop("home_portfolio_snapshot", None)
                     st.session_state.pop("credit_expiry_advice", None)
@@ -1111,7 +1113,9 @@ def main() -> None:
                 if st.form_submit_button("保有銘柄を登録", type="primary", use_container_width=True):
                     try:
                         expiry_value = side_expiry.isoformat() if side_type != "現物" else ""
-                        holding = pd.DataFrame([{"コード": side_code, "銘柄名": side_name, "取引区分": side_type, "信用期限": expiry_value, "株数": side_shares, "取得単価": side_entry, "損切り価格": side_stop}])
+                        resolved_name = company_display_name(side_code)
+                        holding_name = side_name.strip() or ("" if resolved_name == "会社名未取得" else resolved_name)
+                        holding = pd.DataFrame([{"コード": side_code, "銘柄名": holding_name, "取引区分": side_type, "信用期限": expiry_value, "株数": side_shares, "取得単価": side_entry, "損切り価格": side_stop}])
                         add_holding(holding)
                         st.session_state.pop("home_portfolio_snapshot", None)
                         st.success("保有銘柄を登録しました。")
@@ -1185,7 +1189,7 @@ def main() -> None:
     active_analysis = st.session_state.get("active_analysis")
     if not active_analysis:
         render_home_portfolio(capital_yen, journal, max_positions)
-        st.info("左の「分析する」を押すと、最新データで分析します。")
+        st.info("上の「銘柄検索」を開いて「分析する」を押すと、最新データで分析します。")
         return
     code = active_analysis["code"]
     period_name = active_analysis["period_name"]
