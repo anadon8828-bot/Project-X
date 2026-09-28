@@ -10,7 +10,8 @@ class ResearchIntegrity(unittest.TestCase):
     def test_calendar(self):
         self.assertEqual(expected_price_day(pd.Timestamp('2026-09-20T15:00:00+09:00')),'2026-09-18')
         self.assertEqual(expected_price_day(pd.Timestamp('2026-09-18T08:00:00+09:00')),'2026-09-17')
-        self.assertEqual(expected_price_day(pd.Timestamp('2026-09-18T10:00:00+09:00')),'2026-09-18')
+        self.assertEqual(expected_price_day(pd.Timestamp('2026-09-18T10:00:00+09:00')),'2026-09-17')
+        self.assertEqual(expected_price_day(pd.Timestamp('2026-09-18T16:00:00+09:00')),'2026-09-18')
     def test_freshness(self):
         now=pd.Timestamp('2026-09-18T15:00:00+09:00')
         rows=pd.DataFrame([{'株価基準日':'2026-09-18','取得日時':s} for s in ['2026-09-18T14:40:00+09:00','2026-09-18T14:00:00+09:00','2026-09-18T16:00:00+09:00','bad']])

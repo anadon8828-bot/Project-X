@@ -15,7 +15,9 @@ def expected_price_day(now=None):
     cal = tokyo_calendar()
     day = pd.Timestamp(local.date())
     session = cal.date_to_session(day,direction='previous')
-    if session.date()==local.date() and now.tz_convert('UTC') < cal.session_open(session):
+    # Daily-bar research must use a completed session.  During the trading
+    # day Yahoo may not expose today's final daily candle yet.
+    if session.date()==local.date() and now.tz_convert('UTC') < cal.session_close(session):
         session = cal.previous_session(session)
     return str(session.date())
 

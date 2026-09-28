@@ -99,7 +99,8 @@ def render_watchlist(read_saved, root, open_stock):
             except (OSError, ValueError):
                 st.caption("更新状況を確認できません。")
         started = pd.to_datetime(state.get("started"), utc=True, errors="coerce")
-        retry_allowed = pd.isna(started) or now.tz_convert("UTC") - started > pd.Timedelta(minutes=15)
+        wait = pd.Timedelta(minutes=15) if state.get("state") == "RUNNING" else pd.Timedelta(minutes=2)
+        retry_allowed = pd.isna(started) or now.tz_convert("UTC") - started > wait
         heartbeat = pd.to_datetime(state.get('heartbeat',state.get('started')),utc=True,errors='coerce')
         stalled = pd.isna(heartbeat) or now.tz_convert('UTC')-heartbeat>pd.Timedelta(minutes=10)
         if (state.get("state") != "RUNNING" or stalled) and retry_allowed:
