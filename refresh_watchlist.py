@@ -11,7 +11,7 @@ from tse_universe import load_universe
 ROOT = Path(__file__).resolve().parent
 
 
-def acquire_lock(path, stale_after=pd.Timedelta(minutes=30)):
+def acquire_lock(path, stale_after=pd.Timedelta(minutes=5)):
     """Create a portable process lock that works on Windows and Render Linux."""
     try:
         descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
