@@ -14,7 +14,7 @@ import yfinance as yf
 from plotly.subplots import make_subplots
 from risk_engine import make_trade_plan
 from trade_journal import add_plan, close_plan, journal_metrics, journal_state, load_journal, open_plan, position_status
-from project_x_auth import password_is_configured, verify_password
+from project_x_auth import password_is_configured, public_research_enabled, save_public_research, verify_password
 from portfolio_store import add_holding, load_portfolio, save_portfolio
 from settings_store import load_settings, save_settings
 from home_research import render_home_research
@@ -675,11 +675,15 @@ def require_login() -> bool:
         [data-testid="stFormSubmitButton"] button { min-height: 48px; font-size: 1rem; }
     }
     </style>""", unsafe_allow_html=True)
+    if st.session_state.get("project_x_authenticated"):
+        st.session_state.project_x_public_view = False
+        return True
+    if public_research_enabled():
+        st.session_state.project_x_public_view = True
+        return True
     if not password_is_configured():
         st.warning("外部アクセス保護が未設定です。PC上で python set_project_x_password.py を実行してください。")
         return False
-    if st.session_state.get("project_x_authenticated"):
-        return True
     st.markdown('<div class="px-login-card"><div class="px-login-kicker">株式分析・個人専用</div><div class="px-login-title">Project X</div><p class="px-login-copy">パスワードを入力してログインしてください。</p>', unsafe_allow_html=True)
     with st.form("project_x_login"):
         password = st.text_input("パスワード", type="password", placeholder="パスワードを入力")
@@ -688,10 +692,30 @@ def require_login() -> bool:
     if submitted:
         if verify_password(password):
             st.session_state.project_x_authenticated = True
+            st.session_state.project_x_public_view = False
             st.rerun()
         else:
             st.error("パスワードが正しくありません。")
     return False
+
+
+def render_admin_login() -> None:
+    st.subheader("管理者ログイン")
+    st.caption("保有銘柄・資金設定・売買記録を開くにはパスワードが必要です。")
+    if not password_is_configured():
+        st.error("管理者パスワードが設定されていません。")
+        return
+    with st.form("project_x_admin_login"):
+        password = st.text_input("管理者パスワード", type="password")
+        submitted = st.form_submit_button("管理者としてログイン", type="primary", use_container_width=True)
+    if submitted:
+        if verify_password(password):
+            st.session_state.project_x_authenticated = True
+            st.session_state.project_x_public_view = False
+            st.session_state.main_menu = "ホーム"
+            st.rerun()
+        else:
+            st.error("パスワードが正しくありません。")
 
 
 def v3_backtest(model, model2, data: pd.DataFrame, threshold: float = .60) -> tuple[pd.DataFrame, dict]:
@@ -1031,15 +1055,17 @@ def main() -> None:
     }
     </style>""", unsafe_allow_html=True)
     st.markdown("""<div class="px-brand"><div class="px-brand__kicker">JAPAN EQUITY RESEARCH · PRIVATE</div><div class="px-brand__title">Project X</div><div class="px-brand__sub">AI予測・市場環境・需給・テクニカルを、検証結果とともに確認するリサーチ環境</div></div>""", unsafe_allow_html=True)
+    public_view = bool(st.session_state.get("project_x_public_view")) and not bool(st.session_state.get("project_x_authenticated"))
     if "main_menu" not in st.session_state:
         st.session_state.main_menu = "ホーム"
-    menu_columns = st.columns(4)
-    menu_items = [
-        ("ホーム", "ホーム"),
-        ("検索", "銘柄検索"),
-        ("デイトレ", "デイトレ"),
-        ("保有・設定", "保有・設定"),
-    ]
+    menu_items = (
+        [("ホーム", "おすすめ"), ("デイトレ", "デイトレ"), ("管理者ログイン", "管理者ログイン")]
+        if public_view
+        else [("ホーム", "ホーム"), ("検索", "銘柄検索"), ("デイトレ", "デイトレ"), ("保有・設定", "保有・設定")]
+    )
+    if st.session_state.main_menu not in {item[0] for item in menu_items}:
+        st.session_state.main_menu = "ホーム"
+    menu_columns = st.columns(len(menu_items))
     for menu_column, (menu_value, menu_label) in zip(menu_columns, menu_items):
         with menu_column:
             if st.button(
@@ -1054,6 +1080,15 @@ def main() -> None:
                 st.rerun()
     section = st.session_state.main_menu
     st.caption(f"表示中：{section}")
+
+    if public_view:
+        st.info("パスワードなしの閲覧モードです。保有銘柄・資金設定・売買記録は表示されません。")
+        if section == "管理者ログイン":
+            render_admin_login()
+            return
+        if section == "ホーム":
+            render_home_research()
+            return
 
     market = "日本株"
     if section in {"検索", "デイトレ"}:
@@ -1082,6 +1117,16 @@ def main() -> None:
         st.session_state.max_positions = saved_settings["max_positions"]
     if "risk_per_trade" not in st.session_state:
         st.session_state.risk_per_trade = saved_settings["risk_per_trade"]
+    if section == "保有・設定":
+        st.subheader("アクセス設定")
+        allow_public = st.toggle(
+            "パスワードなしでおすすめ・デイトレを閲覧できるようにする",
+            value=public_research_enabled(),
+            help="ONでも保有銘柄・資金設定・売買記録は管理者パスワードで保護されます。",
+        )
+        if st.button("アクセス設定を保存", use_container_width=True):
+            save_public_research(allow_public)
+            st.success("アクセス設定を保存しました。")
     controls_expanded = section in {"検索", "保有・設定"}
     with st.expander("銘柄検索・保有銘柄・運用設定", expanded=controls_expanded):
         st.markdown('<div class="px-sidebar-mark">✦ Project <span>X</span></div>', unsafe_allow_html=True)

@@ -11,6 +11,7 @@ import yfinance as yf
 from vwap_chart import with_vwap
 
 US_SYMBOLS='AAPL MSFT NVDA AMZN META GOOGL TSLA AMD AVGO NFLX PLTR COIN MSTR INTC MU QCOM ARM ORCL CRM UBER JPM BAC GS XOM CVX WMT COST DIS PYPL SOFI'.split()
+JP_DETAIL_LIMIT=120
 
 
 def dates(market,now=None):
@@ -50,17 +51,42 @@ def rank(rows):
     return df.sort_values(['priority','コード'],ascending=[False,True]).head(5).drop(columns='priority').to_dict('records')
 
 
+def jp_detail_symbols(root,names,expected,limit=JP_DETAIL_LIMIT):
+    """Use an all-TSE first-stage screen, then refresh only the liquid shortlist."""
+    sources=[('watchlist_fresh_candidates.csv','当日全東証スキャン'),('tse_all_scan_candidates.csv','保存済み全東証一次選抜')]
+    for filename,label in sources:
+        path=root/filename
+        if not path.exists():
+            continue
+        try:
+            data=pd.read_csv(path,encoding='utf-8-sig',dtype={'コード':str})
+            if 'コード' not in data:
+                continue
+            if filename.startswith('watchlist') and '株価基準日' in data:
+                data=data[data['株価基準日'].astype(str)==expected]
+            turnover=pd.to_numeric(data.get('平均売買代金(百万円)'),errors='coerce')
+            ordered=data.assign(_turnover=turnover).sort_values('_turnover',ascending=False)
+            symbols=[code for code in ordered['コード'].dropna().astype(str) if code in names][:limit]
+            if symbols:
+                return symbols,label
+        except (OSError,ValueError,pd.errors.ParserError):
+            continue
+    return list(names), '東証内国普通株一覧（一次選抜なし）'
+
+
 def scan(market,root):
     expected,target=dates(market)
     if market=='JP':
         from tse_universe import load_universe
-        u=load_universe(refresh=True)
+        u=load_universe(refresh=False)
         names=dict(zip(u['コード'].astype(str),u['銘柄名']))
+        symbols,selection_source=jp_detail_symbols(root,names,expected)
     else:
         names={s:s for s in US_SYMBOLS}
+        symbols=list(names)
+        selection_source='米国固定リスト'
     rows=[]
     failed=0
-    symbols=list(names)
     for offset in range(0,len(symbols),60):
         batch=symbols[offset:offset+60]
         tickers=[s+'.T' if market=='JP' else s for s in batch]
@@ -82,7 +108,7 @@ def scan(market,root):
                 row['会社名']=info.get('longName') or row['コード']
             except Exception:
                 pass
-    payload={'created':pd.Timestamp.now(tz='UTC').isoformat(),'price_day':expected,'target_day':target,'universe':len(symbols),'eligible':len(rows),'errors':failed,'rows':selected}
+    payload={'created':pd.Timestamp.now(tz='UTC').isoformat(),'price_day':expected,'target_day':target,'universe':len(names),'detail_universe':len(symbols),'selection_source':selection_source,'eligible':len(rows),'errors':failed,'rows':selected}
     path=root/f'daytrade_{market}.json'
     temp=path.with_suffix('.tmp')
     temp.write_text(json.dumps(payload,ensure_ascii=False,allow_nan=False),encoding='utf-8')
@@ -97,7 +123,7 @@ def render_daytrade(market,root):
     expected,target=dates(market)
     st.caption(f'対象営業日：{target} ／ 使用する確定日足：{expected}。取引中の場合、前営業日までの暫定選定です。市場現地日付で判定します。')
     st.warning('未検証の監視リストです。翌日の利益・値動きは予測しません。遅延配信のため、発注前のリアルタイム価格・板・スプレッドは証券会社で確認してください。')
-    st.caption('対象：東証内国普通株一覧' if market=='JP' else '対象：米国の大型・活発な30銘柄の固定リスト（米国全銘柄ではありません）：'+', '.join(US_SYMBOLS))
+    st.caption('対象：東証内国普通株の全銘柄一次選抜から、流動性上位を最新日足で詳細確認' if market=='JP' else '対象：米国の大型・活発な30銘柄の固定リスト（米国全銘柄ではありません）：'+', '.join(US_SYMBOLS))
     st.caption('条件：20日平均売買代金が日本株1億円／米国株2千万ドル以上、平均日中値幅1〜12%。優先度は売買代金40%・出来高倍率40%・値幅20%の相対順位。上昇確率や期待利益ではありません。')
     if st.button('最新データで候補5選を作成',key='daytrade_scan_'+market):
         with st.spinner('対象銘柄を取得・評価しています。日本株は数分かかる場合があります…'):
@@ -111,11 +137,10 @@ def render_daytrade(market,root):
     except (OSError,ValueError):
         st.info('候補は未作成です。上のボタンで作成してください。')
         return
-    age=pd.Timestamp.now(tz='UTC')-pd.Timestamp(payload['created'])
-    if payload['price_day']!=expected or payload['target_day']!=target or not pd.Timedelta(0)<=age<=pd.Timedelta(minutes=30):
+    if payload['price_day']!=expected or payload['target_day']!=target:
         st.warning('保存済み候補の有効期限が切れています。更新するまで表示しません。')
         return
-    st.caption(f"取得：{pd.Timestamp(payload['created']).tz_convert('Asia/Tokyo')} ／ 対象 {payload['universe']}・条件適合 {payload['eligible']}・処理例外 {payload['errors']}。適合以外には欠損・古い日付・条件除外を含みます。")
+    st.caption(f"取得：{pd.Timestamp(payload['created']).tz_convert('Asia/Tokyo')} ／ 全対象 {payload['universe']}・詳細確認 {payload.get('detail_universe',payload['universe'])}・条件適合 {payload['eligible']}・処理例外 {payload['errors']}。一次選抜：{payload.get('selection_source','不明')}。")
     rows=payload['rows']
     if not rows:
         st.info('条件を満たす銘柄はありません。無理に5銘柄に埋めません。')
