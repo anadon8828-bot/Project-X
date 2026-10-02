@@ -18,6 +18,17 @@ class CloudRuntimeTest(unittest.TestCase):
         self.assertLess(price_coverage(3700, 3429), 0.08)
         self.assertGreater(price_coverage(3700, 23), 0.99)
 
+    def test_incomplete_current_day_bar_is_removed(self):
+        from refresh_watchlist import completed_daily_bars
+
+        frame = pd.DataFrame(
+            {"Close": [100.0, 101.0], "Volume": [1000, 200]},
+            index=pd.to_datetime(["2026-10-01", "2026-10-02"]),
+        )
+        completed = completed_daily_bars(frame, "2026-10-01")
+        self.assertEqual(len(completed), 1)
+        self.assertEqual(str(completed.index[-1].date()), "2026-10-01")
+
     def test_portable_lock_excludes_second_process(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "scan.lock"

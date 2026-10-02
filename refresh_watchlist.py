@@ -17,6 +17,17 @@ def price_coverage(processed, failed):
     return max(processed - failed, 0) / processed if processed else 0.0
 
 
+def completed_daily_bars(frame, expected_day):
+    """Remove today's still-forming Yahoo daily candle before validation."""
+    if frame.empty:
+        return frame
+    dates = pd.DatetimeIndex(frame.index)
+    if dates.tz is not None:
+        dates = dates.tz_convert("Asia/Tokyo").tz_localize(None)
+    cutoff = pd.Timestamp(expected_day)
+    return frame.loc[dates.normalize() <= cutoff].copy()
+
+
 def acquire_lock(path, stale_after=pd.Timedelta(minutes=5)):
     """Create a portable process lock that works on Windows and Render Linux."""
     try:
@@ -114,6 +125,7 @@ def main():
                 code = str(stock["コード"])
                 try:
                     frame = raw[f"{code}.T"].dropna(subset=["Close", "Volume"])
+                    frame = completed_daily_bars(frame, expected_day)
                     now = pd.Timestamp.now(tz="Asia/Tokyo")
                     observed = str(frame.index[-1].date()) if not frame.empty else ""
                     if len(frame) < 76 or observed not in accepted_days:
