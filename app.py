@@ -4,6 +4,7 @@ from pathlib import Path
 import json
 import re
 import sqlite3
+import unicodedata
 
 import joblib
 import numpy as np
@@ -991,17 +992,49 @@ def render_home_portfolio(capital_yen: float, journal: pd.DataFrame, max_positio
     render_home_research()
 
 
-def company_display_name(code: str) -> str:
-    """Resolve the Japanese company name from the locally saved JPX master."""
+@st.cache_data(ttl=86400)
+def company_master() -> pd.DataFrame:
+    """Load the JPX company master used by code and company-name search."""
     path = APP_DIR / "tse_domestic_common_stocks.csv"
     try:
         names = pd.read_csv(path, encoding="utf-8-sig", dtype={"コード": "string"})
-        matches = names.loc[names["コード"].str.strip().str.upper() == code.strip().upper(), "銘柄名"].dropna()
-        if not matches.empty and str(matches.iloc[0]).strip():
-            return str(matches.iloc[0]).strip()
+        if not {"コード", "銘柄名"}.issubset(names.columns):
+            raise KeyError("JPX master columns are missing")
+        names = names.copy()
+        names["コード"] = names["コード"].fillna("").astype(str).str.strip().str.upper()
+        names["銘柄名"] = names["銘柄名"].fillna("").astype(str).str.strip()
+        if "市場" not in names.columns:
+            names["市場"] = ""
+        return names.loc[
+            (names["コード"] != "") & (names["銘柄名"] != ""),
+            ["コード", "銘柄名", "市場"],
+        ].reset_index(drop=True)
     except (OSError, ValueError, KeyError, pd.errors.ParserError):
-        pass
-    return "会社名未取得"
+        return pd.DataFrame(columns=["コード", "銘柄名", "市場"])
+
+
+def normalize_stock_query(value: str) -> str:
+    return unicodedata.normalize("NFKC", str(value)).replace(" ", "").replace("　", "").casefold()
+
+
+def company_search_candidates(query: str, limit: int = 30) -> pd.DataFrame:
+    """Return exact matches first, followed by partial code/name matches."""
+    master = company_master()
+    normalized = normalize_stock_query(query)
+    if master.empty or not normalized:
+        return master.head(0)
+    code_key = master["コード"].map(normalize_stock_query)
+    name_key = master["銘柄名"].map(normalize_stock_query)
+    exact = (code_key == normalized) | (name_key == normalized)
+    partial = code_key.str.contains(normalized, regex=False) | name_key.str.contains(normalized, regex=False)
+    return pd.concat([master.loc[exact], master.loc[partial & ~exact]], ignore_index=True).head(limit)
+
+
+def company_display_name(code: str) -> str:
+    """Resolve the Japanese company name from the locally saved JPX master."""
+    master = company_master()
+    matches = master.loc[master["コード"] == str(code).strip().upper(), "銘柄名"]
+    return str(matches.iloc[0]) if not matches.empty else "会社名未取得"
 
 
 def main() -> None:
@@ -1053,8 +1086,8 @@ def main() -> None:
         h2 { font-size: 1.25rem !important; }
         h3 { font-size: 1.05rem !important; }
         p, label, [data-testid="stMarkdownContainer"] { line-height: 1.45; }
-        [data-testid="stHorizontalBlock"] { gap: .38rem; flex-wrap: wrap; }
-        [data-testid="column"] { min-width: 100% !important; flex: 1 1 100% !important; }
+        [data-testid="stHorizontalBlock"] { gap: .38rem; flex-direction: column !important; flex-wrap: nowrap !important; }
+        [data-testid="column"] { width: 100% !important; min-width: 100% !important; flex: 1 1 100% !important; }
         [data-testid="stMetric"] { display: block; padding: .78rem .8rem; min-height: 88px; border-radius: 11px; }
         [data-testid="stMetricLabel"] { display: block; margin: 0 0 .3rem; font-size: .76rem; line-height: 1.35; }
         [data-testid="stMetricValue"] { display: block; margin: 0; font-size: 1.14rem; line-height: 1.3; text-align: left; white-space: normal; overflow-wrap: anywhere; }
@@ -1121,10 +1154,6 @@ def main() -> None:
     journal = load_journal()
     open_positions, recorded_loss_streak = journal_state(journal)
     production_ready, production_reason = production_gate()
-    if production_ready:
-        st.success(f"実戦投入ゲート: 通過 — {production_reason}")
-    else:
-        st.warning(f"実戦投入ゲート: 未通過 — {production_reason}")
     with st.expander("Project Xの検証・運用状況", expanded=False):
         st.dataframe(research_status_summary(), hide_index=True, use_container_width=True)
     saved_settings = load_settings()
@@ -1134,6 +1163,10 @@ def main() -> None:
         st.session_state.max_positions = saved_settings["max_positions"]
     if "risk_per_trade" not in st.session_state:
         st.session_state.risk_per_trade = saved_settings["risk_per_trade"]
+    capital_yen = st.session_state.capital_yen
+    max_positions = st.session_state.max_positions
+    risk_per_trade = st.session_state.risk_per_trade
+    loss_streak = recorded_loss_streak
     if section == "保有・設定":
         st.subheader("アクセス設定")
         allow_public = st.toggle(
@@ -1148,18 +1181,35 @@ def main() -> None:
     with st.expander("銘柄検索・保有銘柄・運用設定", expanded=controls_expanded):
         st.markdown('<div class="px-sidebar-mark">✦ Project <span>X</span></div>', unsafe_allow_html=True)
         st.header("分析条件")
-        code = st.text_input("東証銘柄コード", "7203", max_chars=4).strip()
+        query = st.text_input(
+            "銘柄コードまたは会社名",
+            value="",
+            placeholder="例: 7203 / 485A / トヨタ",
+        ).strip()
+        candidates = company_search_candidates(query)
+        selected_code = ""
+        if query and candidates.empty:
+            st.warning("該当する東証銘柄が見つかりません。コードまたは会社名を確認してください。")
+        elif not candidates.empty:
+            labels = {
+                f"{row['コード']}　{row['銘柄名']}"
+                + (f"（{row['市場']}）" if str(row["市場"]).strip() else ""): row["コード"]
+                for _, row in candidates.iterrows()
+            }
+            selected_label = st.selectbox("検索結果", list(labels), key="jp_company_search_result")
+            selected_code = labels[selected_label]
         period_name = st.selectbox("表示期間", list(PERIODS), index=1)
-        capital_yen = st.number_input("運用資金（円）", min_value=100_000, step=100_000, key="capital_yen")
-        max_positions = st.slider("最大保有数", 1, 10, key="max_positions")
-        risk_per_trade = st.select_slider("1取引の損失上限", options=[.005, .01, .015, .02], format_func=lambda value: f"{value * 100:.1f}%", key="risk_per_trade")
-        loss_streak = st.number_input("直近の連敗数", min_value=0, max_value=20, value=int(recorded_loss_streak), step=1)
-        if st.button("運用設定を保存", use_container_width=True):
-            try:
-                save_settings(capital_yen, max_positions, risk_per_trade)
-                st.success("運用設定を保存しました。")
-            except ValueError as exc:
-                st.error(str(exc))
+        if section == "保有・設定":
+            capital_yen = st.number_input("運用資金（円）", min_value=100_000, step=100_000, key="capital_yen")
+            max_positions = st.slider("最大保有数", 1, 10, key="max_positions")
+            risk_per_trade = st.select_slider("1取引の損失上限", options=[.005, .01, .015, .02], format_func=lambda value: f"{value * 100:.1f}%", key="risk_per_trade")
+            loss_streak = st.number_input("直近の連敗数", min_value=0, max_value=20, value=int(recorded_loss_streak), step=1)
+            if st.button("運用設定を保存", use_container_width=True):
+                try:
+                    save_settings(capital_yen, max_positions, risk_per_trade)
+                    st.success("運用設定を保存しました。")
+                except ValueError as exc:
+                    st.error(str(exc))
         run = st.button("分析する", type="primary", use_container_width=True)
         go_home = st.button("ホームを表示", use_container_width=True)
         st.caption("例: 7203（トヨタ）、6758（ソニーG）、485A")
@@ -1243,9 +1293,12 @@ def main() -> None:
         st.session_state.pop("active_analysis", None)
         st.rerun()
     if run:
-        selected_code = code.upper()
-        if not re.fullmatch(r"(?:\d{4}|\d{3}[A-Z])", selected_code):
-            st.error("東証コードを入力してください（例: 7203、485A）。")
+        if not selected_code:
+            direct_code = unicodedata.normalize("NFKC", query).strip().upper()
+            if re.fullmatch(r"(?:\d{4}|\d{3}[A-Z])", direct_code):
+                selected_code = direct_code
+        if not selected_code:
+            st.error("銘柄コードまたは会社名を入力し、検索結果から銘柄を選択してください。")
             return
         st.session_state.active_analysis = {"code": selected_code, "period_name": period_name}
     active_analysis = st.session_state.get("active_analysis")
@@ -1402,10 +1455,6 @@ def main() -> None:
         r4.metric("提案株数", f"{plan.suggested_shares} 株")
         st.caption(f"{plan.reason}／リスクリワード {plan.risk_reward:.2f}／最大許容損失 ¥{plan.maximum_loss_yen:,.0f}。前提: 資金¥{capital_yen:,.0f}・最大{max_positions}銘柄・1取引の損失上限{risk_per_trade * 100:.1f}%・信用取引なし。")
         st.caption(f"取引記録: 保有中 {open_positions} 銘柄、直近連敗 {recorded_loss_streak} 回")
-        if not production_ready:
-            st.warning(f"実戦投入ゲート: 未通過 — {production_reason}。AI・業種・心理シグナルは研究・監視用途として表示し、新規売買計画は記録できません。")
-        else:
-            st.success(f"実戦投入ゲート: 通過 — {production_reason}")
         st.subheader("Project X 総合スコアの内訳")
         display_score_details = score_details.copy()
         display_score_details["加点"] = display_score_details["加点"].round(1)
@@ -1413,8 +1462,6 @@ def main() -> None:
         if st.button("ペーパートレード計画を記録", use_container_width=True):
             add_plan(code, plan, mode="PAPER")
             st.success("ペーパートレードとして取引記録に保存しました。実資金の発注は行いません。")
-        if not production_ready:
-            st.caption("実資金の売買計画は、実戦投入ゲートを通過するまで記録・提案しません。")
         st.caption("AIモデルには学習時に保存された特徴量名・順番で入力しています。")
         if hasattr(model, "feature_importances_"):
             importance = pd.DataFrame({"特徴量": getattr(model, "feature_names_in_", FEATURES), "重要度": model.feature_importances_}).sort_values("重要度", ascending=False)
