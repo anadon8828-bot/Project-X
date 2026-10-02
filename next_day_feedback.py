@@ -157,6 +157,120 @@ def apply_calibration(root: Path, probability: float, expected_pct: float) -> tu
     return probability, expected_pct, calibration
 
 
+def live_feedback_status(root: Path) -> dict:
+    """Return factual live-ledger metrics for the admin dashboard."""
+    history = _read_frame(root / HISTORY_NAME)
+    results = _read_frame(root / RESULTS_NAME)
+    calibration = load_calibration(root)
+    if results.empty:
+        settled = results
+        missing = 0
+    elif "settlement_status" in results:
+        settled = results[results["settlement_status"] == "SETTLED"].copy()
+        missing = int((results["settlement_status"] == "MISSING_TARGET_BAR").sum())
+    else:
+        settled = results[pd.to_numeric(results.get("actual_return_pct"), errors="coerce").notna()].copy()
+        missing = 0
+    latest_date = ""
+    latest_predictions = 0
+    if not history.empty and "prediction_date" in history:
+        latest_date = str(history["prediction_date"].dropna().astype(str).max())
+        latest_predictions = int((history["prediction_date"].astype(str) == latest_date).sum())
+    accuracy = None
+    mae = None
+    brier = None
+    if not settled.empty:
+        direction = pd.to_numeric(settled.get("direction_correct"), errors="coerce").dropna()
+        if not direction.empty:
+            accuracy = float(direction.mean() * 100)
+        actual = pd.to_numeric(settled.get("actual_return_pct"), errors="coerce")
+        expected = pd.to_numeric(settled.get("raw_expected_pct"), errors="coerce")
+        valid_return = actual.notna() & expected.notna()
+        if valid_return.any():
+            mae = float((actual[valid_return] - expected[valid_return]).abs().mean())
+        probability = pd.to_numeric(settled.get("raw_probability"), errors="coerce")
+        actual_up = pd.to_numeric(settled.get("actual_up"), errors="coerce")
+        valid_probability = probability.notna() & actual_up.notna()
+        if valid_probability.any():
+            brier = float(((probability[valid_probability] - actual_up[valid_probability]) ** 2).mean())
+    return {
+        "total_predictions": int(len(history)),
+        "prediction_days": int(history["prediction_date"].nunique()) if not history.empty and "prediction_date" in history else 0,
+        "latest_prediction_date": latest_date,
+        "latest_predictions": latest_predictions,
+        "settled": int(len(settled)),
+        "missing_target_bars": missing,
+        "direction_accuracy_pct": accuracy,
+        "return_mae_pct": mae,
+        "brier": brier,
+        "calibration_status": str(calibration.get("status", "COLLECTING")),
+        "calibration_min_settled": int(calibration.get("min_settled", MIN_SETTLED)),
+        "probability_adjustment_active": bool(calibration.get("status") == "APPROVED" and calibration.get("probability_approved")),
+        "return_adjustment_active": bool(calibration.get("status") == "APPROVED" and calibration.get("return_approved")),
+    }
+
+
+def live_rule_metrics(root: Path, threshold: float = .55, cost_pct: float = .15) -> dict:
+    """Evaluate one frozen live rule from immutable daily forecasts."""
+    results = _read_frame(root / RESULTS_NAME)
+    base = {
+        "status": "COLLECTING", "trades": 0, "periods": 0,
+        "win_rate_pct": None, "avg_net_return_pct": None,
+        "profit_factor": None, "max_drawdown_pct": None,
+        "max_loss_streak": 0, "threshold": threshold, "cost_pct": cost_pct,
+        "minimum_trades": 100, "minimum_periods": 20,
+    }
+    required = {"prediction_date", "code", "raw_probability", "raw_expected_pct", "actual_return_pct"}
+    if results.empty or not required.issubset(results.columns):
+        return base
+    if "settlement_status" in results:
+        results = results[results["settlement_status"] == "SETTLED"].copy()
+    results["raw_probability"] = pd.to_numeric(results["raw_probability"], errors="coerce")
+    results["raw_expected_pct"] = pd.to_numeric(results["raw_expected_pct"], errors="coerce")
+    results["actual_return_pct"] = pd.to_numeric(results["actual_return_pct"], errors="coerce")
+    results = results.dropna(subset=list(required))
+    results = results.drop_duplicates(["prediction_date", "code"], keep="last")
+    selected = results[(results["raw_probability"] >= threshold) & (results["raw_expected_pct"] > 0)].copy()
+    selected = selected.sort_values(
+        ["prediction_date", "raw_expected_pct", "raw_probability", "code"],
+        ascending=[True, False, False, True],
+    ).groupby("prediction_date", as_index=False).head(3)
+    if selected.empty:
+        return base
+    net = selected["actual_return_pct"] - cost_pct
+    gains = float(net[net > 0].sum())
+    losses = float(-net[net < 0].sum())
+    profit_factor = gains / losses if losses > 0 else None
+    daily = selected.assign(_net=net).groupby("prediction_date")["_net"].mean().sort_index()
+    equity = (1 + daily / 100).cumprod()
+    drawdown = (equity / equity.cummax() - 1) * 100
+    streak = maximum_loss_streak(net)
+    base.update({
+        "trades": int(len(selected)),
+        "periods": int(selected["prediction_date"].nunique()),
+        "win_rate_pct": float((net > 0).mean() * 100),
+        "avg_net_return_pct": float(net.mean()),
+        "profit_factor": profit_factor,
+        "max_drawdown_pct": float(drawdown.min()),
+        "max_loss_streak": streak,
+    })
+    enough = base["trades"] >= base["minimum_trades"] and base["periods"] >= base["minimum_periods"]
+    passed = enough and base["avg_net_return_pct"] > 0 and profit_factor is not None and profit_factor >= 1.1
+    base["status"] = "APPROVED" if passed else ("REJECTED" if enough else "COLLECTING")
+    return base
+
+
+def maximum_loss_streak(returns: pd.Series) -> int:
+    longest = current = 0
+    for value in returns:
+        if float(value) < 0:
+            current += 1
+            longest = max(longest, current)
+        else:
+            current = 0
+    return longest
+
+
 def latest_saved_forecast(root: Path, code: str, prediction_date: str) -> dict | None:
     """Return the immutable cloud-generated forecast for the requested close."""
     history = _read_frame(root / HISTORY_NAME)

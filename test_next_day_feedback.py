@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from next_day_feedback import DailyFeedback, HISTORY_NAME, _next_session, _read_frame, _write_frame
+from next_day_feedback import DailyFeedback, HISTORY_NAME, RESULTS_NAME, _next_session, _read_frame, _write_frame, live_feedback_status, live_rule_metrics
 
 
 class NextDayFeedbackTests(unittest.TestCase):
@@ -58,6 +58,39 @@ class NextDayFeedbackTests(unittest.TestCase):
             path = Path(folder) / "empty.csv.gz"
             _write_frame(path, pd.DataFrame())
             self.assertTrue(_read_frame(path).empty)
+
+    def test_live_feedback_status_uses_settled_rows_only(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            _write_frame(root / HISTORY_NAME, pd.DataFrame([
+                {"prediction_id": "a", "prediction_date": "2026-10-01", "code": "1"},
+                {"prediction_id": "b", "prediction_date": "2026-10-01", "code": "2"},
+            ]))
+            _write_frame(root / RESULTS_NAME, pd.DataFrame([
+                {"prediction_id": "a", "settlement_status": "SETTLED", "direction_correct": 1, "actual_return_pct": 2.0, "raw_expected_pct": 1.0, "raw_probability": .7, "actual_up": 1},
+                {"prediction_id": "b", "settlement_status": "MISSING_TARGET_BAR", "direction_correct": np.nan, "actual_return_pct": np.nan, "raw_expected_pct": 1.0, "raw_probability": .7, "actual_up": np.nan},
+            ]))
+            status = live_feedback_status(root)
+            self.assertEqual(status["latest_predictions"], 2)
+            self.assertEqual(status["settled"], 1)
+            self.assertEqual(status["missing_target_bars"], 1)
+            self.assertEqual(status["direction_accuracy_pct"], 100.0)
+
+    def test_live_rule_uses_top_three_and_transaction_cost(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            rows = []
+            for index in range(4):
+                rows.append({
+                    "prediction_id": str(index), "prediction_date": "2026-10-01", "code": str(index),
+                    "settlement_status": "SETTLED", "raw_probability": .60,
+                    "raw_expected_pct": float(4 - index), "actual_return_pct": 1.0,
+                })
+            _write_frame(root / RESULTS_NAME, pd.DataFrame(rows))
+            metrics = live_rule_metrics(root)
+            self.assertEqual(metrics["trades"], 3)
+            self.assertAlmostEqual(metrics["avg_net_return_pct"], .85)
+            self.assertEqual(metrics["status"], "COLLECTING")
 
 
 if __name__ == "__main__":

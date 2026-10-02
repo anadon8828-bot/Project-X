@@ -588,6 +588,45 @@ def research_status_summary() -> pd.DataFrame:
     short_oos = short_supply_oos_summary()
     rows.append({"項目": "JPX空売り需給", "状態": "研究中" if not short_oos.empty else "データ蓄積中", "内容": "単独の売買シグナルには使用しない"})
     rows.append({"項目": "ペーパートレード", "状態": "利用可能", "内容": "実資金の発注なしで成績を蓄積"})
+    try:
+        from next_day_feedback import live_feedback_status
+        live = live_feedback_status(APP_DIR)
+        adjustment = live["probability_adjustment_active"] or live["return_adjustment_active"]
+        rows.append({
+            "項目": "全東証・翌日予測ログ",
+            "状態": "補正稼働中" if adjustment else "実績蓄積中",
+            "内容": (
+                f"最新 {live['latest_prediction_date'] or '未記録'}：{live['latest_predictions']:,}件／"
+                f"累計予測 {live['total_predictions']:,}件／答え合わせ {live['settled']:,}件／"
+                f"補正判定 {live['calibration_status']}"
+            ),
+        })
+    except Exception as exc:
+        rows.append({"項目": "全東証・翌日予測ログ", "状態": "確認失敗", "内容": str(exc)})
+    summary = walk_forward_summary()
+    rule = summary[(summary.get("strategy") == "最終ルール（AI+テクニカル・上位3）") & (summary.get("threshold").astype(str) == "0.6")] if not summary.empty else pd.DataFrame()
+    if rule.empty:
+        rows.append({"項目": "最終売買ルールOOS", "状態": "検証結果なし", "内容": "Walk-forward結果待ち"})
+    else:
+        item = rule.iloc[0]
+        passed = float(item.get("trades", 0)) >= 30 and float(item.get("profit_factor", 0)) >= 1.1 and float(item.get("avg_return", 0)) > 0
+        rows.append({
+            "項目": "最終売買ルールOOS",
+            "状態": "採用基準通過" if passed else "不採用",
+            "内容": f"取引 {int(item.get('trades', 0))}件／PF {float(item.get('profit_factor', 0)):.2f}／平均 {float(item.get('avg_return', 0)):.2f}%／最大DD {float(item.get('max_drawdown', 0)):.2f}%",
+        })
+    try:
+        from next_day_feedback import live_rule_metrics
+        live_rule = live_rule_metrics(APP_DIR)
+        pf = "未集計" if live_rule["profit_factor"] is None else f"{live_rule['profit_factor']:.2f}"
+        average = "未集計" if live_rule["avg_net_return_pct"] is None else f"{live_rule['avg_net_return_pct']:.3f}%"
+        rows.append({
+            "項目": "固定ルール・ライブ検証",
+            "状態": {"APPROVED": "採用基準通過", "REJECTED": "不採用", "COLLECTING": "実績蓄積中"}.get(live_rule["status"], live_rule["status"]),
+            "内容": f"コスト後：取引 {live_rule['trades']}件／日数 {live_rule['periods']}日／PF {pf}／平均 {average}",
+        })
+    except Exception as exc:
+        rows.append({"項目": "固定ルール・ライブ検証", "状態": "確認失敗", "内容": str(exc)})
     return pd.DataFrame(rows)
 
 
@@ -1156,6 +1195,37 @@ def main() -> None:
     production_ready, production_reason = production_gate()
     with st.expander("Project Xの検証・運用状況", expanded=False):
         st.dataframe(research_status_summary(), hide_index=True, use_container_width=True)
+        try:
+            from next_day_feedback import live_feedback_status, live_rule_metrics
+            live = live_feedback_status(APP_DIR)
+            st.caption("翌日予測の実績（実際の答え合わせが済んだ行だけで計算）")
+            live_rows = [
+                {"指標": "最新予測日", "値": live["latest_prediction_date"] or "未記録"},
+                {"指標": "最新日の予測数", "値": f"{live['latest_predictions']:,}件"},
+                {"指標": "累計予測", "値": f"{live['total_predictions']:,}件"},
+                {"指標": "答え合わせ済み", "値": f"{live['settled']:,}件"},
+                {"指標": "方向一致率", "値": "未集計" if live["direction_accuracy_pct"] is None else f"{live['direction_accuracy_pct']:.1f}%"},
+                {"指標": "予想騰落率MAE", "値": "未集計" if live["return_mae_pct"] is None else f"{live['return_mae_pct']:.3f}%"},
+                {"指標": "Brier Score", "値": "未集計" if live["brier"] is None else f"{live['brier']:.4f}"},
+                {"指標": "自動補正", "値": "稼働中" if live["probability_adjustment_active"] or live["return_adjustment_active"] else f"未適用（{live['calibration_status']}）"},
+            ]
+            st.dataframe(pd.DataFrame(live_rows), hide_index=True, use_container_width=True)
+            st.caption("自動補正は500件以上の答え合わせ後、時系列ホールドアウトで未補正より改善した場合だけ有効になります。")
+            live_rule = live_rule_metrics(APP_DIR)
+            st.caption("固定売買ルールのライブ・フォワード検証（上昇確率55%以上・期待騰落率プラス・各日上位3・コスト0.15%控除）")
+            rule_rows = [
+                {"指標": "状態", "値": {"APPROVED": "採用基準通過", "REJECTED": "不採用", "COLLECTING": "実績蓄積中"}.get(live_rule["status"], live_rule["status"])},
+                {"指標": "取引数／検証日数", "値": f"{live_rule['trades']}件／{live_rule['periods']}日"},
+                {"指標": "勝率", "値": "未集計" if live_rule["win_rate_pct"] is None else f"{live_rule['win_rate_pct']:.1f}%"},
+                {"指標": "コスト後平均損益", "値": "未集計" if live_rule["avg_net_return_pct"] is None else f"{live_rule['avg_net_return_pct']:.3f}%"},
+                {"指標": "Profit Factor", "値": "未集計" if live_rule["profit_factor"] is None else f"{live_rule['profit_factor']:.2f}"},
+                {"指標": "最大ドローダウン", "値": "未集計" if live_rule["max_drawdown_pct"] is None else f"{live_rule['max_drawdown_pct']:.2f}%"},
+                {"指標": "最大連敗", "値": f"{live_rule['max_loss_streak']}回"},
+            ]
+            st.dataframe(pd.DataFrame(rule_rows), hide_index=True, use_container_width=True)
+            st.caption("採用判定は100取引・20日以上、コスト後平均プラス、PF 1.10以上をすべて満たした場合だけです。")
+        except Exception as exc:
+            st.caption(f"翌日予測ログを確認できません：{exc}")
     saved_settings = load_settings()
     if "capital_yen" not in st.session_state:
         st.session_state.capital_yen = saved_settings["capital_yen"]
