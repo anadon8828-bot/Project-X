@@ -10,6 +10,11 @@ from tse_universe import load_universe
 from persistent_store import write_bytes
 
 ROOT = Path(__file__).resolve().parent
+MIN_PRICE_COVERAGE = 0.80
+
+
+def price_coverage(processed, failed):
+    return max(processed - failed, 0) / processed if processed else 0.0
 
 
 def acquire_lock(path, stale_after=pd.Timedelta(minutes=5)):
@@ -132,10 +137,19 @@ def main():
             done = min(offset+60,len(universe))
             feedback.checkpoint()
             status(state="RUNNING",started=started,processed=done,total=len(universe),eligible=len(rows),failed=failed,excluded=excluded,expected_price_day=expected_day,accepted_price_days=sorted(accepted_days))
-            # Publish an honest partial result quickly; the UI clearly shows RUNNING.
-            if rows and (done <= 180 or done % 300 == 0):
+            # Publish partial rows only while the data provider is demonstrably
+            # returning a broad market sample.  A tiny fresh subset must never
+            # replace the last complete scan.
+            batch_coverage = price_coverage(done, failed)
+            if rows and batch_coverage >= MIN_PRICE_COVERAGE and (done <= 180 or done % 300 == 0):
                 write_candidates(rows)
             print(f"取得 {done}/{len(universe)} 評価可能 {len(rows)} 取得不可・古い足 {failed}",flush=True)
+        coverage = price_coverage(len(universe), failed)
+        if coverage < MIN_PRICE_COVERAGE:
+            raise RuntimeError(
+                f"全東証の価格カバレッジ不足: {coverage:.1%} "
+                f"({len(universe) - failed}/{len(universe)})。既存候補は上書きしません。"
+            )
         if not rows:
             raise RuntimeError("当日付の価格を確認できた候補がありません。休場日・取得障害も考えられます。")
         write_candidates(rows)
@@ -154,7 +168,7 @@ def main():
             ROOT / "model_next_day_all_tse_direction.pkl",
             ROOT / "model_next_day_all_tse_return.pkl",
         )
-        status(state="COMPLETED",started=started,finished=pd.Timestamp.now(tz="Asia/Tokyo").isoformat(),processed=len(universe),total=len(universe),eligible=len(rows),failed=failed,excluded=excluded,expected_price_day=expected_day,accepted_price_days=sorted(accepted_days),next_day_feedback=feedback_status)
+        status(state="COMPLETED",started=started,finished=pd.Timestamp.now(tz="Asia/Tokyo").isoformat(),processed=len(universe),total=len(universe),eligible=len(rows),failed=failed,excluded=excluded,price_coverage=coverage,expected_price_day=expected_day,accepted_price_days=sorted(accepted_days),next_day_feedback=feedback_status)
     except Exception as exc:
         status(state="FAILED",started=started,error=str(exc))
         raise

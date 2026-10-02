@@ -12,6 +12,12 @@ from refresh_watchlist import acquire_lock, release_lock
 
 
 class CloudRuntimeTest(unittest.TestCase):
+    def test_price_coverage_rejects_tiny_partial_scan(self):
+        from refresh_watchlist import price_coverage
+
+        self.assertLess(price_coverage(3700, 3429), 0.08)
+        self.assertGreater(price_coverage(3700, 23), 0.99)
+
     def test_portable_lock_excludes_second_process(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "scan.lock"
