@@ -92,7 +92,16 @@ def main():
         for offset in range(0, len(universe), 60):
             batch = universe.iloc[offset:offset+60]
             tickers = [f"{c}.T" for c in batch["コード"]]
-            raw = yf.download(tickers, period="6mo", auto_adjust=True, group_by="ticker", threads=8, progress=False, timeout=15)
+            try:
+                raw = yf.download(tickers, period="6mo", auto_adjust=True, group_by="ticker", threads=8, progress=False, timeout=15)
+            except Exception as exc:
+                failed += len(batch)
+                for code in batch["コード"].astype(str):
+                    feedback.record_failure(code, f"BATCH_DOWNLOAD_FAILED:{type(exc).__name__}:{exc}")
+                feedback.checkpoint()
+                done = min(offset+60, len(universe))
+                status(state="RUNNING", started=started, processed=done, total=len(universe), eligible=len(rows), failed=failed, excluded=excluded)
+                continue
             for _, stock in batch.iterrows():
                 code = str(stock["コード"])
                 try:
@@ -100,6 +109,8 @@ def main():
                     now = pd.Timestamp.now(tz="Asia/Tokyo")
                     if len(frame) < 76 or str(frame.index[-1].date()) != expected_price_day(now):
                         failed += 1
+                        observed = str(frame.index[-1].date()) if not frame.empty else ""
+                        feedback.record_failure(code, "INSUFFICIENT_OR_STALE_PRICE_HISTORY", observed)
                         continue
                     feedback.observe(code, stock.get("業種", "不明"), frame)
                     close, volume = frame.Close, frame.Volume
@@ -112,9 +123,11 @@ def main():
                     signals = [close.iloc[-1] > ma25.iloc[-1], ma25.iloc[-1] > ma75.iloc[-1], macd.iloc[-1] > 0, volume.iloc[-1] > volume.iloc[-2]]
                     reasons = [label for flag,label in zip(signals,["株価が25日線より上","25日線が75日線より上","MACDがプラス","前日より出来高増加"]) if flag]
                     rows.append({**stock.to_dict(), "終値":float(close.iloc[-1]), "平均売買代金(百万円)":value/1e6, "テクニカル一致数":sum(signals), "候補根拠":"／".join(reasons), "株価基準日":str(frame.index[-1].date()), "取得日時":now.isoformat()})
-                except (KeyError, ValueError, IndexError, TypeError):
+                except (KeyError, ValueError, IndexError, TypeError) as exc:
                     failed += 1
+                    feedback.record_failure(code, f"TICKER_PROCESSING_FAILED:{type(exc).__name__}:{exc}")
             done = min(offset+60,len(universe))
+            feedback.checkpoint()
             status(state="RUNNING",started=started,processed=done,total=len(universe),eligible=len(rows),failed=failed,excluded=excluded)
             # Publish an honest partial result quickly; the UI clearly shows RUNNING.
             if rows and (done <= 180 or done % 300 == 0):
