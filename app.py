@@ -220,7 +220,7 @@ def judge(p: float, p2: float, wave: dict, patterns: list[dict]) -> tuple[str, s
     pattern_score = sum(x["score"] for x in patterns)
     score = int(p >= .60) + int(p2 >= .60) + wave["score"] + int(pattern_score > 0) - int(pattern_score < 0)
     if score >= 3:
-        return "強気候補", "AI予測とチャート形状が同方向です。価格・出来高を確認して判断してください。", score
+        return "上向き要素あり（参考）", "AI予測とチャート形状が同方向ですが、統合ルールは実戦基準未達です。", score
     if score <= 0:
         return "慎重", "AI予測またはチャート形状に弱気要因があります。", score
     return "様子見", "材料が混在しています。確度が上がるまで待つ局面です。", score
@@ -281,16 +281,16 @@ def news_material_score(ticker: str) -> tuple[int, list[str]]:
 
 
 def score_breakdown(p: float, p2: float, technical: int, wave: dict, patterns: list[dict], market: int, news: int) -> pd.DataFrame:
-    """Show exactly how the Project X score is assembled."""
+    """Show the research score and non-scoring, unvalidated observations."""
     sakata = max(-2, min(2, sum(item["score"] for item in patterns)))
     rows = [
         {"要素": "5日上昇確率", "状態": f"{p * 100:.1f}%", "加点": p * 40},
         {"要素": "5営業日後の終値が+2%以上となる確率", "状態": f"{p2 * 100:.1f}%", "加点": p2 * 20},
         {"要素": "テクニカル", "状態": f"{technical}/4", "加点": technical * 5},
-        {"要素": "エリオット波動", "状態": wave["label"], "加点": wave["score"] * 5},
-        {"要素": "酒田五法", "状態": f"シグナル {sakata:+d}", "加点": sakata * 2.5},
-        {"要素": "市場環境", "状態": "良好" if market > 0 else "注意" if market < 0 else "中立", "加点": market * 5},
-        {"要素": "ニュース・材料", "状態": f"シグナル {news:+d}", "加点": news * 2.5},
+        {"要素": "エリオット波動（参考）", "状態": wave["label"], "加点": 0.0},
+        {"要素": "酒田五法（参考）", "状態": f"シグナル {sakata:+d}", "加点": 0.0},
+        {"要素": "市場環境（参考）", "状態": "良好" if market > 0 else "注意" if market < 0 else "中立", "加点": 0.0},
+        {"要素": "ニュース・材料（参考）", "状態": f"シグナル {news:+d}", "加点": 0.0},
     ]
     return pd.DataFrame(rows)
 
@@ -298,8 +298,10 @@ def score_breakdown(p: float, p2: float, technical: int, wave: dict, patterns: l
 def integrated_score(p: float, p2: float, technical: int, wave: dict, patterns: list[dict], market: int, news: int) -> tuple[int, str]:
     details = score_breakdown(p, p2, technical, wave, patterns, market, news)
     raw = details["加点"].sum()
-    score = int(max(0, min(100, round(raw))))
-    label = "買い候補" if score >= 75 else "保有・監視" if score >= 60 else "見送り"
+    # Maximum is deliberately 80: only model outputs and transparent technical
+    # observations count. Unvalidated narrative heuristics remain display-only.
+    score = int(max(0, min(80, round(raw))))
+    label = "研究優先度・高" if score >= 60 else "研究優先度・中" if score >= 48 else "研究優先度・低"
     return score, label
 
 
@@ -373,12 +375,11 @@ def fundamental_table(ticker: str) -> pd.DataFrame:
 def market_table() -> pd.DataFrame:
     table = market_snapshot().copy()
     if table.empty:
-        return pd.DataFrame(columns=["指標", "終値", "前日比(%)", "5日方向", "総合スコアへの扱い"])
-    score_indicators = {"日経平均", "TOPIX", "NASDAQ", "S&P500", "VIX", "米10年金利"}
-    table["総合スコアへの扱い"] = table["指標"].map(lambda name: "反映" if name in score_indicators else "参考")
+        return pd.DataFrame(columns=["指標", "終値", "前日比(%)", "5日方向", "研究スコアへの扱い"])
+    table["研究スコアへの扱い"] = "参考（加点なし）"
     table["終値"] = table["終値"].map(lambda value: round(value, 2) if pd.notna(value) else "取得不可")
     table["前日比(%)"] = table["前日比(%)"].map(lambda value: round(value, 2) if pd.notna(value) else "-")
-    return table[["指標", "終値", "前日比(%)", "5日方向", "総合スコアへの扱い"]]
+    return table[["指標", "終値", "前日比(%)", "5日方向", "研究スコアへの扱い"]]
 
 
 def walk_forward_summary() -> pd.DataFrame:
@@ -817,12 +818,9 @@ def rank_stocks(model, model2) -> pd.DataFrame:
             if sector:
                 relative = float(last.Return_5D * 100) - float(sector["平均5日騰落率(%)"])
                 sector_label = f"{sector['業種']}：{sector['判定']}（業種比 {relative:+.2f}%）"
-                if sector["判定"] == "上昇傾向" and relative > 0:
-                    sector_bonus = 4
-                elif sector["判定"] == "下落傾向" and relative < 0:
-                    sector_bonus = -4
-            total_score = int(max(0, min(100, total_score + sector_bonus)))
-            label = "買い候補" if total_score >= 75 else "保有・監視" if total_score >= 60 else "見送り"
+            # The sector-relative model failed its OOS gate. Keep the observation
+            # visible, but never alter the research score with it.
+            label = "研究優先度・高" if total_score >= 60 else "研究優先度・中" if total_score >= 48 else "研究優先度・低"
             downside_risk = max(float(last.ATR * 1.5 / last.Close), float(last.Volatility_20D))
             # Do not treat an unvalidated return-magnitude model as a trade edge.
             if return_model_approved and expected_return is not None:
@@ -1405,8 +1403,8 @@ def main() -> None:
     b.metric("5営業日後の終値が上昇する確率", f"{p * 100:.1f}%")
     c.metric("5営業日後の終値が+2%以上となる確率", f"{p2 * 100:.1f}%")
     st.caption("学習対象：基準日の終値に対する5営業日後の終値。途中で+2%に到達する確率ではありません。表示はモデル推定値で、確率の校正・実戦有効性は保証されません。")
-    d.metric("参考ルール判定（未検証）", integrated_label, f"参考スコア {score}")
-    st.caption("参考ルール判定は買い推奨ではありません。ホームの候補採用とは別で、実売買の条件成立を保証しません。")
+    d.metric("研究優先度（売買判定ではない）", integrated_label, f"研究スコア {score}/80")
+    st.caption("研究スコアは候補を比較するための値です。買い推奨ではなく、実売買の条件成立を保証しません。")
     from candidate_watchlist import render_candidate_detail
     render_candidate_detail(APP_DIR, code)
     from research_extras import render_risk_check, render_events
@@ -1429,7 +1427,7 @@ def main() -> None:
             st.plotly_chart(chart(chart_data, chart_wave, timeframe), use_container_width=True, config={"displayModeBar": False, "scrollZoom": False, "displaylogo": False})
             st.caption('VWAPは各足の高値・安値・終値の平均×出来高から計算した近似です。分足は日本時間の日ごとにリセット、日足以上は取得期間の先頭起点で、当日VWAPとは異なります。')
             if timeframe in {"1分足", "5分足", "15分足"}:
-                st.caption("分足は配信元の提供可能期間内で表示します。AI予測・総合スコアは日足を基準に計算しています。")
+                st.caption("分足は配信元の提供可能期間内で表示します。AI予測・研究スコアは日足を基準に計算しています。")
             else:
                 st.caption("日足以上ではMA25・MA75・RSIを表示します。エリオットの節目は日足のみの参考表示です。")
         except Exception as exc:
@@ -1496,8 +1494,8 @@ def main() -> None:
             st.caption("空売り残高・信用残は公表日時点の公式データです。需給の注意材料として表示し、単独で売買判断には使いません。")
         if extended:
             e1, e2, e3 = st.columns(3)
-            e1.metric("5日以内に+5%", f"{extended['+5%確率'] * 100:.1f}%")
-            e2.metric("5日以内に+10%", f"{extended['+10%確率'] * 100:.1f}%")
+            e1.metric("5営業日後の終値が+5%以上", f"{extended['+5%確率'] * 100:.1f}%")
+            e2.metric("5営業日後の終値が+10%以上", f"{extended['+10%確率'] * 100:.1f}%")
             e3.metric("5日後の予測上昇幅", f"{extended['5日後上昇幅'] * 100:+.2f}%")
             if not return_model_approved:
                 st.warning("上昇幅モデルはWalk-forwardで誤差が大きいため、現在は参考表示です。売買判定・期待値・提案株数には使いません。")
@@ -1517,15 +1515,15 @@ def main() -> None:
         else:
             st.warning("翌営業日予測モデルは最終OOS基準未達のため、予測値・予測レンジを表示していません。")
             st.dataframe(next_day, hide_index=True, use_container_width=True)
-        st.subheader("売買ルール・資金管理")
+        st.subheader("研究用の売買計画（実資金では使用しない）")
         r1, r2, r3, r4 = st.columns(4)
         r1.metric("判定", plan.action)
-        r2.metric("損切り目安", f"¥{plan.stop:,.0f}")
-        r3.metric("利確目安", f"¥{plan.target:,.0f}")
-        r4.metric("提案株数", f"{plan.suggested_shares} 株")
+        r2.metric("研究用ストップ", f"¥{plan.stop:,.0f}")
+        r3.metric("研究用ターゲット", f"¥{plan.target:,.0f}")
+        r4.metric("ペーパー株数", f"{plan.suggested_shares} 株")
         st.caption(f"{plan.reason}／リスクリワード {plan.risk_reward:.2f}／最大許容損失 ¥{plan.maximum_loss_yen:,.0f}。前提: 資金¥{capital_yen:,.0f}・最大{max_positions}銘柄・1取引の損失上限{risk_per_trade * 100:.1f}%・信用取引なし。")
         st.caption(f"取引記録: 保有中 {open_positions} 銘柄、直近連敗 {recorded_loss_streak} 回")
-        st.subheader("Project X 総合スコアの内訳")
+        st.subheader("Project X 研究スコアの内訳（最大80点）")
         display_score_details = score_details.copy()
         display_score_details["加点"] = display_score_details["加点"].round(1)
         st.dataframe(display_score_details, hide_index=True, use_container_width=True)
@@ -1543,7 +1541,7 @@ def main() -> None:
         except Exception as exc:
             st.warning(f"ファンダメンタルを取得できませんでした: {exc}")
         st.subheader("ニュース・材料")
-        st.caption("銘柄コード・公表日時・出典を照合した公式開示のみ。見出し分類を利益予測や総合スコアには加点しません。")
+        st.caption("銘柄コード・公表日時・出典を照合した公式開示のみ。見出し分類を利益予測や研究スコアには加点しません。")
         try:
             from research_rules import valid_materials
             snapshot = json.loads((APP_DIR / 'verified_materials.json').read_text(encoding='utf-8'))
@@ -1647,7 +1645,7 @@ def main() -> None:
             st.info("JPX空売り残高の蓄積後に、翌営業日からの5日間で検証結果を表示します。")
         else:
             st.dataframe(short_oos, hide_index=True, use_container_width=True)
-            st.caption("公表対象のみを検証しています。未公表をゼロとして扱わず、成績改善が明確になるまで総合スコア・売買判断には加えません。")
+            st.caption("公表対象のみを検証しています。未公表をゼロとして扱わず、成績改善が明確になるまで研究スコア・売買判断には加えません。")
         st.subheader("事前固定テクニカルルール・完全OOS検証")
         fixed_oos = fixed_rules_oos_summary()
         if fixed_oos.empty:
@@ -1660,7 +1658,7 @@ def main() -> None:
             st.warning("Walk-forward結果がありません。python walk_forward_v3.py を実行してください。")
         else:
             st.dataframe(wf_summary, hide_index=True, use_container_width=True)
-            st.caption("AI選別と同日ベースラインを比較してください。AI選別が一貫してPF・DD・平均リターンで上回るまでは、買い候補は研究用途です。")
+            st.caption("AI選別と同日ベースラインを比較してください。AI選別が一貫してPF・DD・平均リターンで上回るまでは、研究候補から実資金候補へ昇格させません。")
         st.subheader("AI確率・テクニカル条件別のOOS成績")
         conditions = condition_analysis()
         if conditions.empty:

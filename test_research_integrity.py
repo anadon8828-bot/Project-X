@@ -4,6 +4,7 @@ import pandas as pd
 from research_rules import fresh_rows, valid_materials, assessment, expected_price_day
 from candidate_watchlist import select_watchlist, select_by_price_band
 from verified_materials import parse_page, classify
+from risk_engine import make_trade_plan
 
 
 class ResearchIntegrity(unittest.TestCase):
@@ -61,6 +62,14 @@ class ResearchIntegrity(unittest.TestCase):
     def test_news_expiry(self):
         now=pd.Timestamp('2026-09-18T15:00:00+09:00')
         self.assertEqual(valid_materials({'checked':'2026-09-18T14:00:00+09:00','records':[{'published':now.isoformat()}]},now),[])
+
+    def test_unapproved_rule_never_emits_buy_candidate(self):
+        plan=make_trade_plan(
+            price=1000,atr=20,ai_probability=.90,probability_2pct=.90,
+            expected_return=.10,technical_score=4,capital_yen=1_000_000,
+        )
+        self.assertEqual(plan.action,'研究候補（未採用）')
+        self.assertNotIn('買い候補',plan.action)
 
 if __name__=='__main__':
     unittest.main()

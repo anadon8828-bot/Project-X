@@ -59,5 +59,5 @@ def make_trade_plan(
     elif rr < 2 or shares == 0:
         action, reason = "見送り", "リスクリワードまたは許容損失の条件を満たしません"
     else:
-        action, reason = "買い候補", "AI・期待値・テクニカル・資金管理の条件を満たしました"
+        action, reason = "研究候補（未採用）", "数値条件は満たしますが、最終売買ルールがOOS採用基準未達のため実資金には使用しません"
     return TradePlan(action, reason, price, stop, target, stop_distance, target_distance, rr, shares, shares * stop_distance)
