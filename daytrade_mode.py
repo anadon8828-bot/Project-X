@@ -12,6 +12,18 @@ from vwap_chart import with_vwap
 from persistent_store import read_bytes, write_bytes
 
 US_SYMBOLS='AAPL MSFT NVDA AMZN META GOOGL TSLA AMD AVGO NFLX PLTR COIN MSTR INTC MU QCOM ARM ORCL CRM UBER JPM BAC GS XOM CVX WMT COST DIS PYPL SOFI'.split()
+US_NAMES = {
+    'AAPL':'Apple', 'MSFT':'Microsoft', 'NVDA':'NVIDIA', 'AMZN':'Amazon',
+    'META':'Meta Platforms', 'GOOGL':'Alphabet', 'TSLA':'Tesla',
+    'AMD':'Advanced Micro Devices', 'AVGO':'Broadcom', 'NFLX':'Netflix',
+    'PLTR':'Palantir Technologies', 'COIN':'Coinbase Global',
+    'MSTR':'Strategy', 'INTC':'Intel', 'MU':'Micron Technology',
+    'QCOM':'Qualcomm', 'ARM':'Arm Holdings', 'ORCL':'Oracle',
+    'CRM':'Salesforce', 'UBER':'Uber Technologies', 'JPM':'JPMorgan Chase',
+    'BAC':'Bank of America', 'GS':'Goldman Sachs', 'XOM':'Exxon Mobil',
+    'CVX':'Chevron', 'WMT':'Walmart', 'COST':'Costco Wholesale',
+    'DIS':'Walt Disney', 'PYPL':'PayPal', 'SOFI':'SoFi Technologies',
+}
 JP_DETAIL_LIMIT=120
 
 
@@ -83,7 +95,7 @@ def scan(market,root):
         names=dict(zip(u['コード'].astype(str),u['銘柄名']))
         symbols,selection_source=jp_detail_symbols(root,names,expected)
     else:
-        names={s:s for s in US_SYMBOLS}
+        names={s:US_NAMES.get(s, s) for s in US_SYMBOLS}
         symbols=list(names)
         selection_source='米国固定リスト'
     rows=[]
@@ -102,13 +114,6 @@ def scan(market,root):
                 failed+=1
         print(f'{market}: {min(offset+60,len(symbols))}/{len(symbols)}',flush=True)
     selected=rank(rows)
-    if market=='US':
-        for row in selected:
-            try:
-                info=yf.Ticker(row['コード']).get_info()
-                row['会社名']=info.get('longName') or row['コード']
-            except Exception:
-                pass
     payload={'created':pd.Timestamp.now(tz='UTC').isoformat(),'price_day':expected,'target_day':target,'universe':len(names),'detail_universe':len(symbols),'selection_source':selection_source,'eligible':len(rows),'errors':failed,'rows':selected}
     path=root/f'daytrade_{market}.json'
     write_bytes(path,json.dumps(payload,ensure_ascii=False,allow_nan=False).encode('utf-8'))

@@ -29,6 +29,12 @@ class CloudRuntimeTest(unittest.TestCase):
         self.assertEqual(len(completed), 1)
         self.assertEqual(str(completed.index[-1].date()), "2026-10-01")
 
+    def test_us_daytrade_names_do_not_require_quote_metadata(self):
+        from daytrade_mode import US_NAMES, US_SYMBOLS
+
+        self.assertEqual(set(US_NAMES), set(US_SYMBOLS))
+        self.assertEqual(US_NAMES["AAPL"], "Apple")
+
     def test_portable_lock_excludes_second_process(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "scan.lock"
