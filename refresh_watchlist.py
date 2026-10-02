@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 from verified_materials import collect_materials
-from research_rules import expected_price_day
+from research_rules import accepted_price_days, expected_price_day
 from tse_universe import load_universe
 from persistent_store import write_bytes
 
@@ -86,6 +86,9 @@ def main():
     try:
         status(state="RUNNING", started=started, processed=0)
         universe = prioritize_universe(load_universe(refresh=True))
+        now = pd.Timestamp.now(tz="Asia/Tokyo")
+        accepted_days = accepted_price_days(now)
+        expected_day = expected_price_day(now)
         materials = {"state":"RUNNING","checked":pd.Timestamp.now(tz="Asia/Tokyo").isoformat(),"records":[]}
         news_path = ROOT / "verified_materials.json"
         write_bytes(news_path, json.dumps(materials,ensure_ascii=False).encode("utf-8"))
@@ -107,9 +110,9 @@ def main():
                 try:
                     frame = raw[f"{code}.T"].dropna(subset=["Close", "Volume"])
                     now = pd.Timestamp.now(tz="Asia/Tokyo")
-                    if len(frame) < 76 or str(frame.index[-1].date()) != expected_price_day(now):
+                    observed = str(frame.index[-1].date()) if not frame.empty else ""
+                    if len(frame) < 76 or observed not in accepted_days:
                         failed += 1
-                        observed = str(frame.index[-1].date()) if not frame.empty else ""
                         feedback.record_failure(code, "INSUFFICIENT_OR_STALE_PRICE_HISTORY", observed)
                         continue
                     feedback.observe(code, stock.get("業種", "不明"), frame)
@@ -128,7 +131,7 @@ def main():
                     feedback.record_failure(code, f"TICKER_PROCESSING_FAILED:{type(exc).__name__}:{exc}")
             done = min(offset+60,len(universe))
             feedback.checkpoint()
-            status(state="RUNNING",started=started,processed=done,total=len(universe),eligible=len(rows),failed=failed,excluded=excluded)
+            status(state="RUNNING",started=started,processed=done,total=len(universe),eligible=len(rows),failed=failed,excluded=excluded,expected_price_day=expected_day,accepted_price_days=sorted(accepted_days))
             # Publish an honest partial result quickly; the UI clearly shows RUNNING.
             if rows and (done <= 180 or done % 300 == 0):
                 write_candidates(rows)
@@ -151,7 +154,7 @@ def main():
             ROOT / "model_next_day_all_tse_direction.pkl",
             ROOT / "model_next_day_all_tse_return.pkl",
         )
-        status(state="COMPLETED",started=started,finished=pd.Timestamp.now(tz="Asia/Tokyo").isoformat(),processed=len(universe),total=len(universe),eligible=len(rows),failed=failed,excluded=excluded,next_day_feedback=feedback_status)
+        status(state="COMPLETED",started=started,finished=pd.Timestamp.now(tz="Asia/Tokyo").isoformat(),processed=len(universe),total=len(universe),eligible=len(rows),failed=failed,excluded=excluded,expected_price_day=expected_day,accepted_price_days=sorted(accepted_days),next_day_feedback=feedback_status)
     except Exception as exc:
         status(state="FAILED",started=started,error=str(exc))
         raise
