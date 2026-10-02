@@ -12,6 +12,16 @@ AUTH_FILE = Path(__file__).resolve().parent / ".project_x_auth.json"
 ACCESS_FILE = Path(__file__).resolve().parent / "project_x_access.json"
 
 
+def login_required() -> bool:
+    """Require the login screen only when explicitly enabled by deployment config.
+
+    Project X currently runs password-free at the owner's request. Keeping this
+    as an explicit opt-in prevents an old password secret or persistent setting
+    from unexpectedly restoring the login screen after a redeploy.
+    """
+    return os.getenv("PROJECT_X_REQUIRE_LOGIN", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def public_research_enabled() -> bool:
     """Allow password-free research without exposing personal portfolio controls."""
     override = os.getenv("PROJECT_X_PUBLIC_RESEARCH")

@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,6 +13,12 @@ from refresh_watchlist import acquire_lock, release_lock
 
 
 class CloudRuntimeTest(unittest.TestCase):
+    def test_login_is_disabled_by_default_and_explicitly_opt_in(self):
+        from project_x_auth import login_required
+        with patch.dict('os.environ', {}, clear=True):
+            self.assertFalse(login_required())
+        with patch.dict('os.environ', {'PROJECT_X_REQUIRE_LOGIN': 'true'}, clear=True):
+            self.assertTrue(login_required())
     def test_price_coverage_rejects_tiny_partial_scan(self):
         from refresh_watchlist import price_coverage
 

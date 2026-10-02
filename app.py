@@ -15,7 +15,7 @@ import yfinance as yf
 from plotly.subplots import make_subplots
 from risk_engine import make_trade_plan
 from trade_journal import add_plan, close_plan, journal_metrics, journal_state, load_journal, open_plan, position_status
-from project_x_auth import password_is_configured, public_research_enabled, save_public_research, verify_password
+from project_x_auth import login_required, password_is_configured, public_research_enabled, save_public_research, verify_password
 from portfolio_store import add_holding, load_portfolio, save_portfolio
 from settings_store import load_settings, save_settings
 from home_research import render_home_research
@@ -705,6 +705,11 @@ def tse_refined_top10() -> pd.DataFrame:
 
 
 def require_login() -> bool:
+    if not login_required():
+        # Open the research screens without a password, while keeping personal
+        # holdings, settings and trade records behind the administrator login.
+        st.session_state.project_x_public_view = True
+        return True
     st.markdown("""<style>
     .stApp { background: radial-gradient(circle at 70% -15%, #203c61 0, transparent 36%), #09111f; }
     [data-testid="stHeader"] { background: transparent; }
