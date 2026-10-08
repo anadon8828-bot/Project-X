@@ -199,8 +199,7 @@ def render_minute_forecast(ticker: str, currency: str = "円") -> None:
     """Render an auto-refreshing research card while this page is open."""
     import streamlit as st
 
-    st.subheader("1分後予測・研究モード")
-    st.caption("次に確定する1分足の終値を予測し、1分後に自動で答え合わせします。Yahoo分足は遅延するため、リアルタイム売買には使用できません。")
+    st.subheader("1分後予測")
 
     @st.fragment(run_every="60s")
     def live_panel() -> None:
@@ -215,13 +214,10 @@ def render_minute_forecast(ticker: str, currency: str = "円") -> None:
             market_tz = "Asia/Tokyo" if ticker.endswith(".T") else "America/New_York"
             base_time = result["base_time"].tz_convert(market_tz).strftime("%Y-%m-%d %H:%M")
             target_time = result["target_time"].tz_convert(market_tz).strftime("%Y-%m-%d %H:%M")
-            st.caption(f"基準足：{base_time} → 対象足：{target_time}（市場現地時刻）／ 学習 {result['training_count']}本・時系列検証 {result['validation_count']}本")
+            st.caption(f"{base_time} 時点 → {target_time} の予測（市場現地時刻・1分ごとに自動更新）")
             if result["data_delay_minutes"] > 2:
-                st.error(f"配信データは約{result['data_delay_minutes']}分遅延しています。これは現在時刻の1分後予測ではなく、遅延時系列上の次の1分を再現する研究予測です。")
-            st.caption(f"{result['correction_status']}。ライブ答え合わせ {result['settled_count']}件。")
-            if result["settled_count"]:
-                st.caption(f"ライブ方向一致率 {result['live_direction_accuracy'] * 100:.1f}% ／ ライブ価格MAE {symbol}{result['live_mae_yen']:,.2f}")
-            st.warning("研究中の推定です。遅延データ・スプレッド・約定可能性を反映せず、発注判断には使用しないでください。")
+                st.error(f"価格データは約{result['data_delay_minutes']}分遅延しています。現在時刻基準の予測ではありません。")
+            st.caption("参考予測です。注文前に証券会社の現在値・板・スプレッドを確認してください。")
         except Exception as exc:
             st.info(f"1分後予測を停止中：{exc}")
 

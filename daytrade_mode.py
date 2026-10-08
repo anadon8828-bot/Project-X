@@ -129,7 +129,7 @@ def render_daytrade(market,root):
     st.warning('未検証の監視リストです。翌日の利益・値動きは予測しません。遅延配信のため、発注前のリアルタイム価格・板・スプレッドは証券会社で確認してください。')
     st.caption('対象：東証内国普通株の全銘柄一次選抜から、流動性上位を最新日足で詳細確認' if market=='JP' else '対象：米国の大型・活発な30銘柄の固定リスト（米国全銘柄ではありません）：'+', '.join(US_SYMBOLS))
     st.caption('条件：20日平均売買代金が日本株1億円／米国株2千万ドル以上、平均日中値幅1〜12%。優先度は売買代金40%・出来高倍率40%・値幅20%の相対順位。上昇確率や期待利益ではありません。')
-    with st.expander('1分後予測・研究モード', expanded=True):
+    with st.expander('1分後予測', expanded=True):
         default_symbol='7203' if market=='JP' else 'AAPL'
         forecast_symbol=st.text_input(
             '1分予測する銘柄コード',value=default_symbol,key='minute_forecast_symbol_'+market,
