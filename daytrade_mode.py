@@ -192,6 +192,8 @@ def render_daytrade(market,root):
         st.plotly_chart(fig,use_container_width=True)
         basis=('市場現地日付で毎日リセット' if daily_vwap else '表示期間の先頭から連続計算')
         st.caption(f'最終足：{frame.index[-1]}。通常取引時間の分足近似VWAP・{basis}。約定データから計算する証券会社のVWAPとは一致しない場合があります。')
+        from minute_forecast import render_minute_forecast
+        render_minute_forecast(ticker, '円' if market=='JP' else '米ドル')
     except Exception as exc:
         st.warning(f'チャート取得不可：{exc}')
 

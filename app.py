@@ -1433,6 +1433,9 @@ def main() -> None:
             st.caption('VWAPは各足の高値・安値・終値の平均×出来高から計算した近似です。分足は日本時間の日ごとにリセット、日足以上は取得期間の先頭起点で、当日VWAPとは異なります。')
             if timeframe in {"1分足", "5分足", "15分足"}:
                 st.caption("分足は配信元の提供可能期間内で表示します。AI予測・研究スコアは日足を基準に計算しています。")
+                if timeframe == "1分足":
+                    from minute_forecast import render_minute_forecast
+                    render_minute_forecast(f"{code}.T", "円")
             else:
                 st.caption("日足以上ではMA25・MA75・RSIを表示します。エリオットの節目は日足のみの参考表示です。")
         except Exception as exc:

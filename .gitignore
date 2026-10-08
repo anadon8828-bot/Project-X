@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 *.pyc
 prediction_history.csv
+minute_forecast_history.json
 .project_x_auth.json
 project_x_portfolio.csv
 project_x_trade_journal.csv
