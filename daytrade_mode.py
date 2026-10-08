@@ -129,6 +129,16 @@ def render_daytrade(market,root):
     st.warning('未検証の監視リストです。翌日の利益・値動きは予測しません。遅延配信のため、発注前のリアルタイム価格・板・スプレッドは証券会社で確認してください。')
     st.caption('対象：東証内国普通株の全銘柄一次選抜から、流動性上位を最新日足で詳細確認' if market=='JP' else '対象：米国の大型・活発な30銘柄の固定リスト（米国全銘柄ではありません）：'+', '.join(US_SYMBOLS))
     st.caption('条件：20日平均売買代金が日本株1億円／米国株2千万ドル以上、平均日中値幅1〜12%。優先度は売買代金40%・出来高倍率40%・値幅20%の相対順位。上昇確率や期待利益ではありません。')
+    with st.expander('1分後予測・研究モード', expanded=True):
+        default_symbol='7203' if market=='JP' else 'AAPL'
+        forecast_symbol=st.text_input(
+            '1分予測する銘柄コード',value=default_symbol,key='minute_forecast_symbol_'+market,
+            help='日本株は7203や485A、米国株はAAPLのように入力してください。',
+        ).strip().upper()
+        if forecast_symbol:
+            from minute_forecast import render_minute_forecast
+            forecast_ticker=forecast_symbol+'.T' if market=='JP' else forecast_symbol
+            render_minute_forecast(forecast_ticker,'円' if market=='JP' else '米ドル')
     if st.button('最新データで候補5選を作成',key='daytrade_scan_'+market):
         with st.spinner('対象銘柄を取得・評価しています。日本株は数分かかる場合があります…'):
             try:
@@ -192,8 +202,6 @@ def render_daytrade(market,root):
         st.plotly_chart(fig,use_container_width=True)
         basis=('市場現地日付で毎日リセット' if daily_vwap else '表示期間の先頭から連続計算')
         st.caption(f'最終足：{frame.index[-1]}。通常取引時間の分足近似VWAP・{basis}。約定データから計算する証券会社のVWAPとは一致しない場合があります。')
-        from minute_forecast import render_minute_forecast
-        render_minute_forecast(ticker, '円' if market=='JP' else '米ドル')
     except Exception as exc:
         st.warning(f'チャート取得不可：{exc}')
 
